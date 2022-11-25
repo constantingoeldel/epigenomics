@@ -1,5 +1,7 @@
+use crate::error::Error;
 use clap::Parser;
 use itertools::Itertools;
+use rayon::prelude::*;
 use std::{
     ffi::OsString,
     fmt::Display,
@@ -7,8 +9,6 @@ use std::{
     io::{self, BufRead, Write},
     path::PathBuf,
 };
-
-use crate::error::Error;
 
 mod error;
 
@@ -171,57 +171,59 @@ fn extract_windows(
     window_size: u32,
     output_dir: String,
 ) -> Result<()> {
-    let mut last_gene = &genes[0];
-    let mut last_gene_index = 0;
-    let mut searched_count = 0;
-    for (path, filename) in methylome_files {
-        println!("Extracting windows for file {:#?} ", filename);
-        let file = File::open(&path).map_err(|_| {
-            Error::FileError(
-                String::from("methylome file"),
-                String::from(filename.to_str().unwrap()),
-            )
-        })?;
-        let lines = io::BufReader::new(file).lines();
+    methylome_files
+        .par_iter()
+        .try_for_each_with(&genes, |genes, (path, filename)| -> Result<()> {
+            let mut last_gene = &genes[0];
+            let mut last_gene_index = 0;
+            let mut searched_count: i64 = 0;
+            println!("Extracting windows for file {:#?} ", filename);
+            let file = File::open(&path).map_err(|_| {
+                Error::FileError(
+                    String::from("methylome file"),
+                    String::from(filename.to_str().unwrap()),
+                )
+            })?;
+            let lines = io::BufReader::new(file).lines();
 
-        for (i, line_result) in lines.enumerate() {
-            if i % 50000 == 0 {
-                println!("Extracting cg_site {i}");
-            }
-
-            if let Ok(line) = line_result {
-                let Some(cg) = CgSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
-                let cg_site_in_gene = |cg: &CgSite, gene: &GbmGene| {
-                    cg.strand == gene.strand
-                        && cg.chromosome == gene.chromosome
-                        && gene.start <= cg.location
-                        && cg.location <= gene.end
-                };
-
-                if cg_site_in_gene(&cg, last_gene) {
-                    place_site(cg, last_gene, window_size, &output_dir, &filename)?;
-                    continue;
-                }
-                let next_gene = &genes[last_gene_index + 1];
-                if cg_site_in_gene(&cg, next_gene) {
-                    place_site(cg, next_gene, window_size, &output_dir, &filename)?;
-                    continue;
+            for (i, line_result) in lines.enumerate() {
+                if i % 50000 == 0 {
+                    println!("Extracting cg_site {i}");
                 }
 
-                for (i, gene) in genes.iter().enumerate() {
-                    searched_count += 1;
-                    if cg_site_in_gene(&cg, gene) {
-                        place_site(cg, gene, window_size, &output_dir, &filename)?;
-                        last_gene = gene;
-                        last_gene_index = i;
-                        break;
+                if let Ok(line) = line_result {
+                    let Some(cg) = CgSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
+                    let cg_site_in_gene = |cg: &CgSite, gene: &GbmGene| {
+                        cg.strand == gene.strand
+                            && cg.chromosome == gene.chromosome
+                            && gene.start <= cg.location
+                            && cg.location <= gene.end
+                    };
+
+                    if cg_site_in_gene(&cg, last_gene) {
+                        place_site(cg, last_gene, window_size, &output_dir, &filename)?;
+                        continue;
+                    }
+                    let next_gene = &genes[last_gene_index + 1];
+                    if cg_site_in_gene(&cg, next_gene) {
+                        place_site(cg, next_gene, window_size, &output_dir, &filename)?;
+                        continue;
+                    }
+
+                    for (i, gene) in genes.iter().enumerate() {
+                        searched_count += 1;
+                        if cg_site_in_gene(&cg, gene) {
+                            place_site(cg, gene, window_size, &output_dir, &filename)?;
+                            last_gene = gene;
+                            last_gene_index = i;
+                            break;
+                        }
                     }
                 }
             }
-        }
-    }
-    println!("Searched through a total of {} genes", searched_count);
-    Ok(())
+            println!("Searched through a total of {} genes", searched_count);
+            Ok(())
+        })
 }
 
 fn place_site(
