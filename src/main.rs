@@ -171,6 +171,9 @@ fn extract_windows(
     window_size: u32,
     output_dir: String,
 ) -> Result<()> {
+    let mut last_gene = &genes[0];
+    let mut last_gene_index = 0;
+    let mut searched_count = 0;
     for (path, filename) in methylome_files {
         println!("Extracting windows for file {:#?} ", filename);
         let file = File::open(&path).map_err(|_| {
@@ -188,36 +191,60 @@ fn extract_windows(
 
             if let Ok(line) = line_result {
                 let Some(cg) = CgSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
-
-                for gene in &genes {
-                    if cg.strand == gene.strand
+                let cg_site_in_gene = |cg: &CgSite, gene: &GbmGene| {
+                    cg.strand == gene.strand
                         && cg.chromosome == gene.chromosome
                         && gene.start <= cg.location
                         && cg.location <= gene.end
-                    {
-                        // CG site belongs to gene
-                        // println!("{} \n {}", gene, cg);
-                        let mut percentile =
-                            (cg.location - gene.start) * 100 / (gene.end - gene.start);
-                        if percentile == 100 {
-                            // very unelegant fix
-                            percentile = 99
-                        }
-                        let window = (percentile / window_size) * window_size; // integer division rounds down
-                        let output_file =
-                            format!("{}/{}/{}", output_dir, window, filename.to_str().unwrap());
-                        let mut file = fs::OpenOptions::new()
-                            .append(true)
-                            .create(true)
-                            .open(&output_file)
-                            .expect(&format!("Could not open output file, {output_file}"));
+                };
 
-                        file.write(cg.original.as_bytes())?;
+                if cg_site_in_gene(&cg, last_gene) {
+                    place_site(cg, last_gene, window_size, &output_dir, &filename)?;
+                    continue;
+                }
+                let next_gene = &genes[last_gene_index + 1];
+                if cg_site_in_gene(&cg, next_gene) {
+                    place_site(cg, next_gene, window_size, &output_dir, &filename)?;
+                    continue;
+                }
+
+                for (i, gene) in genes.iter().enumerate() {
+                    searched_count += 1;
+                    if cg_site_in_gene(&cg, gene) {
+                        place_site(cg, gene, window_size, &output_dir, &filename)?;
+                        last_gene = gene;
+                        last_gene_index = i;
+                        break;
                     }
                 }
             }
         }
     }
+    println!("Searched through a total of {} genes", searched_count);
+    Ok(())
+}
+
+fn place_site(
+    cg: CgSite,
+    gene: &GbmGene,
+    window_size: u32,
+    output_dir: &str,
+    filename: &OsString,
+) -> Result<()> {
+    let mut percentile = (cg.location - gene.start) * 100 / (gene.end - gene.start);
+    if percentile == 100 {
+        // very unelegant fix but otherwise the last cg-site would land in its own category
+        percentile = 99
+    }
+    let window = (percentile / window_size) * window_size; // integer division rounds down
+    let output_file = format!("{}/{}/{}", output_dir, window, filename.to_str().unwrap());
+    let mut file = fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&output_file)
+        .expect(&format!("Could not open output file, {output_file}"));
+
+    file.write(cg.original.as_bytes())?;
     Ok(())
 }
 
