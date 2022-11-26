@@ -24,7 +24,7 @@ Run `extractor --help` for always up-to-date argument syntax specification
 
 ![help options](help.png)
 
-### Neccessary arguments
+###  necessary arguments
 
 Methylome directory: Path of directory containing the methlyome files from which to extract the CG-sites
 
@@ -40,7 +40,7 @@ Output directory: Path of the directory where extracted segments shall be stored
 
 `-o, --output-dir <OUTPUT_DIR>    `
 
-## Optional arguments
+### Optional arguments
 Window size: Size of the window in percent of the gbM-gene length [default: 5]
 
  `-w, --window-size <WINDOW_SIZE>  `
@@ -48,7 +48,7 @@ Window size: Size of the window in percent of the gbM-gene length [default: 5]
 Overwrite: Overwrite current content of the output directory?
 
  ` -f, --force `
- 
+
 Absolute size: Use absolute length in basis-pairs for window size instead of percentage of gene length?
 
  `--absolute                   `
