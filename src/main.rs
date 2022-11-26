@@ -14,7 +14,7 @@ mod error;
 
 type Result<T> = std::result::Result<T, error::Error>;
 
-/// Simple program to greet a person
+/// simple tool to separate a methylome by position within a gene
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
