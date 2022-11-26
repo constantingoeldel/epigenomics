@@ -37,6 +37,10 @@ struct Args {
     /// Overwrite current content of the output directory?
     #[arg(short, long, default_value_t = false)]
     force: bool,
+
+    /// Use absolute length in basis-pairs for window size instead of percentage of gene length
+    #[arg(long, default_value_t = false)]
+    absolute: bool,
 }
 
 struct GbmGene {
@@ -124,17 +128,32 @@ fn main() {
         return;
     }
 
-    let result = set_up_output_dir(&args.output_dir, args.window_size as usize, args.force);
-    if let Err(err) = result {
-        println!("{}", err);
-        return;
-    }
-
     let mut genes: Vec<GbmGene> = Vec::new();
 
     for line in annotation_lines.unwrap() {
         let gene = GbmGene::from_annotation_file_line(&line.unwrap()).unwrap();
         genes.push(gene)
+    }
+
+    let mut max_gene_length: u32 = 0;
+    for gene in &genes {
+        let length = gene.end - gene.start;
+        if length > max_gene_length {
+            max_gene_length = length
+        }
+    }
+    println!("The maximum gene length is {} bp", max_gene_length);
+
+    let result = set_up_output_dir(
+        &args.output_dir,
+        args.window_size as usize,
+        args.force,
+        args.absolute,
+        max_gene_length,
+    );
+    if let Err(err) = result {
+        println!("{}", err);
+        return;
     }
 
     let result = extract_windows(
@@ -178,6 +197,7 @@ fn extract_windows(
             let mut last_gene_index = 0;
             let mut searched_count: i64 = 0;
             println!("Extracting windows for file {:#?} ", filename);
+
             let file = File::open(&path).map_err(|_| {
                 Error::FileError(
                     String::from("methylome file"),
@@ -194,8 +214,8 @@ fn extract_windows(
                 if let Ok(line) = line_result {
                     let Some(cg) = CgSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
                     let cg_site_in_gene = |cg: &CgSite, gene: &GbmGene| {
-                        cg.strand == gene.strand
-                            && cg.chromosome == gene.chromosome
+                        // cg.strand == gene.strand
+                        cg.chromosome == gene.chromosome
                             && gene.start <= cg.location
                             && cg.location <= gene.end
                     };
@@ -234,9 +254,9 @@ fn place_site(
     filename: &OsString,
 ) -> Result<()> {
     let mut percentile = (cg.location - gene.start) * 100 / (gene.end - gene.start);
-    if percentile == 100 {
+    if percentile != 0 {
         // very unelegant fix but otherwise the last cg-site would land in its own category
-        percentile = 99
+        percentile -= 1
     }
     let window = (percentile / window_size) * window_size; // integer division rounds down
     let output_file = format!("{}/{}/{}", output_dir, window, filename.to_str().unwrap());
@@ -245,12 +265,22 @@ fn place_site(
         .create(true)
         .open(&output_file)
         .expect(&format!("Could not open output file, {output_file}"));
-
+    let metadata = file.metadata();
+    if metadata.unwrap().len() == 0 {
+        // On first write to file, create header line
+        file.write("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\n".as_bytes())?;
+    }
     file.write(cg.original.as_bytes())?;
     Ok(())
 }
 
-fn set_up_output_dir(output_path: &str, window_size: usize, overwrite: bool) -> Result<()> {
+fn set_up_output_dir(
+    output_path: &str,
+    window_size: usize,
+    overwrite: bool,
+    absolute: bool,
+    max_gene_length: u32,
+) -> Result<()> {
     fs::read_dir(&output_path).map_err(|_| {
         Error::FileError(String::from("Output directory"), String::from(output_path))
     })?; // Throw error if base output dir does not exist
@@ -259,14 +289,72 @@ fn set_up_output_dir(output_path: &str, window_size: usize, overwrite: bool) -> 
         fs::remove_dir_all(&output_path).unwrap();
         fs::create_dir(&output_path).unwrap();
     }
+    let edgelist = String::from(
+        "from to
+0_0 1_2
+1_2 2_2
+2_2 3_2
+3_2 4_2
+4_2 5_2
+5_2 6_2
+6_2 7_2
+7_2 8_2
+8_2 9_2
+9_2 10_2
+10_2 11_2
+0_0 1_8
+1_8 2_8
+2_8 3_8
+3_8 4_8
+4_8 5_8
+5_8 6_8
+6_8 7_8
+7_8 8_8
+8_8 9_8
+9_8 10_8
+10_8 11_8",
+    );
+    let max = if absolute { max_gene_length } else { 100 };
+    for i in (0..max).step_by(window_size) {
+        let nodelist = format!(
+            "filename,node,gen,meth
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G0_All.txt,0_0,0,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G1_L2_All.txt,1_2,1,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G1_L8_All.txt,1_8,1,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G2_L2_All.txt,2_2,2,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G2_L8_All.txt,2_8,2,Y
+-,3_2,3,N
+-,3_8,3,N
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G4_L2_All.txt,4_2,4,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G4_L8_All.txt,4_8,4,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G5_L2_All.txt,5_2,5,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G5_L8_All.txt,5_8,5,Y
+-,6_2,6,N
+-,6_8,6,N
+-,7_2,7,N
+-,7_8,7,N
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G8_L2_All.txt,8_2,8,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G8_L8_All.txt,8_8,8,Y
+-,9_2,9,N
+-,9_8,9,N
+-,10_2,10,N
+-,10_8,10,N
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G11_L2_All.txt,11_2,11,Y
+/mnt/extStorage/constantin/windows/{i}/methylome_Col0_G11_L8_All.txt,11_8,11,Y
+"
+        );
 
-    for i in (0..100).step_by(window_size) {
         let path = format!("{}/{}", &output_path, i);
         let window_dir = fs::read_dir(&path);
 
         match window_dir {
             Ok(_) => continue,
-            Err(_) => fs::create_dir(path).unwrap(),
+            Err(_) => {
+                fs::create_dir(&path).unwrap();
+                fs::write(path.to_owned() + "/nodelist.fn", nodelist)
+                    .expect("Nodelist not writable at ");
+                fs::write(path.to_owned() + "/edgelist.fn", &edgelist).expect("msg");
+            }
         };
     }
     Ok(())
