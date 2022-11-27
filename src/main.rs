@@ -1,10 +1,10 @@
 use crate::error::Error;
-use clap::{builder::Str, Parser};
-use itertools::{zip_eq, Itertools};
+use clap::Parser;
+use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
     ffi::OsString,
-    fmt::{format, Display},
+    fmt::Display,
     fs::{self, File},
     io::{self, BufRead, Write},
     path::PathBuf,
@@ -46,20 +46,31 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     ignore_strand: bool,
 }
+#[derive(Clone, PartialEq)]
+enum Strand {
+    Sense,
+    Antisense,
+}
 
+#[derive(Clone)]
 struct GbmGene {
     chromosome: u8,
     start: u32,
     end: u32,
     name: String,
-    strand: bool, // true for + strand, false for - strand
+    strand: Strand,
 }
 #[derive(Clone)]
 struct CgSite {
     chromosome: u8,
     location: u32,
-    strand: bool, // true for + strand, false for - strand
+    strand: Strand,
     original: String,
+}
+#[derive(Clone)]
+struct GenesByStrand {
+    sense: Vec<GbmGene>,
+    antisense: Vec<GbmGene>,
 }
 
 impl GbmGene {
@@ -71,7 +82,11 @@ impl GbmGene {
                 start: start.parse::<u32>().unwrap(),
                 end: end.parse::<u32>().unwrap(),
                 name: String::from(name),
-                strand: strand == "+",
+                strand: if strand == "+" {
+                    Strand::Sense
+                } else {
+                    Strand::Antisense
+                },
             })
     }
 }
@@ -84,7 +99,11 @@ impl CgSite {
             .map(|(chromosome, location, strand, _, _, _, _, _, _)| CgSite {
                 chromosome: chromosome.parse::<u8>().unwrap(),
                 location: location.parse::<u32>().unwrap(),
-                strand: strand == "+",
+                strand: if strand == "+" {
+                    Strand::Sense
+                } else {
+                    Strand::Antisense
+                },
                 original: s.to_owned().clone(),
             })
     }
@@ -95,12 +114,17 @@ impl Display for GbmGene {
         write!(
             f,
             "Gene {} is located on the {} strand of chromosome {} ranging from bp {} to bp {} ",
-            self.name,
-            if self.strand { "+" } else { "-" },
-            self.chromosome,
-            self.start,
-            self.end
+            self.name, self.strand, self.chromosome, self.start, self.end
         )
+    }
+}
+
+impl Display for Strand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Strand::Sense => write!(f, "+"),
+            Strand::Antisense => write!(f, "-"),
+        }
     }
 }
 
@@ -109,9 +133,7 @@ impl Display for CgSite {
         write!(
             f,
             "CG site is located on the {} strand of chromosome {} at bp {}",
-            if self.strand { "+" } else { "-" },
-            self.chromosome,
-            self.location
+            self.strand, self.chromosome, self.location
         )
     }
 }
@@ -139,7 +161,32 @@ fn main() {
         genes.push(gene)
     }
 
+    let chromosome_count = genes // number of different chromosomes assuming they are named from 1 to highest
+        .iter()
+        .max_by_key(|g| g.chromosome)
+        .unwrap()
+        .chromosome;
+
     genes.sort_by_key(|g| g.start); // Sort genes by start bp (propably already the case), needed for binary search
+
+    // Structure genes first by chromosome, then by + and - strand => [Chromosome_1(+ Strand, - Strand), Chromosome_2(+,-), ..]
+    let mut structured_genes: Vec<GenesByStrand> = vec![
+        GenesByStrand {
+            sense: Vec::new(),
+            antisense: Vec::new()
+        };
+        chromosome_count.into()
+    ];
+    // Put genes into their correct bucket
+    genes.iter().for_each(|g| {
+        let chromosome = &mut structured_genes[(g.chromosome - 1) as usize];
+        let strand = match &g.strand {
+            Strand::Sense => &mut chromosome.sense,
+            Strand::Antisense => &mut chromosome.antisense,
+        };
+        strand.push(g.to_owned());
+    });
+    println!("{:?}", structured_genes[0].sense.len());
 
     let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
     if args.absolute {
@@ -167,7 +214,7 @@ fn main() {
 
     let result = extract_windows(
         methylome_files.unwrap(),
-        genes,
+        structured_genes,
         args.window_size,
         &args.output_dir,
         window_count,
@@ -197,17 +244,17 @@ fn load_methylome(methylome: String) -> Result<Vec<(PathBuf, OsString)>> {
 
 fn extract_windows(
     methylome_files: Vec<(PathBuf, OsString)>,
-    genes: Vec<GbmGene>,
+    genome: Vec<GenesByStrand>,
     window_size: u32,
     output_dir: &str,
     window_count: usize,
     ignore_strand: bool,
 ) -> Result<()> {
-    methylome_files
-        .par_iter()
-        .try_for_each_with(&genes, |genes, (path, filename)| -> Result<()> {
-            let mut last_gene = &genes[0];
-            let mut last_gene_index = 0;
+    methylome_files.par_iter().try_for_each_with(
+        &genome,
+        |genome, (path, filename)| -> Result<()> {
+            let mut last_gene = &genome[0].sense[0];
+            // let mut last_gene_index = 0;
             let mut searched_count: i64 = 0;
             let mut skipped_count: i64 = 0;
             let mut windows: Vec<Vec<CgSite>> = vec![Vec::new(); window_count];
@@ -220,11 +267,7 @@ fn extract_windows(
                 )
             })?;
             let lines = io::BufReader::new(file).lines();
-            for (i, line_result) in lines.enumerate() {
-                if i % 100_000 == 0 {
-                    println!("Extracting cg_site {i}");
-                }
-
+            for line_result in lines {
                 if let Ok(line) = line_result {
                     let Some(cg) = CgSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
                     let cg_site_in_gene = |cg: &CgSite, gene: &GbmGene| {
@@ -239,33 +282,47 @@ fn extract_windows(
                         place_site(cg, last_gene, window_size, &mut windows)?;
                         continue;
                     }
-                    let next_gene = &genes[last_gene_index + 1];
-                    if cg_site_in_gene(&cg, next_gene) {
-                        skipped_count += 1;
-                        place_site(cg, next_gene, window_size, &mut windows)?;
-                        continue;
+
+                    let mut results: Vec<&GbmGene> = Vec::new(); // Collection of closest genes on all chromosomes and strands
+                    for chromosome in genome.iter() {
+                        for strand in [&chromosome.sense, &chromosome.antisense] {
+                            let result =
+                                strand.binary_search_by_key(&cg.location, |gene| gene.start);
+
+                            let gene = match result {
+                                Ok(i) => &strand[i],
+                                Err(i) => {
+                                    if strand.len() > i + 1 {
+                                        &strand[i + 1]
+                                    } else {
+                                        &strand[i - 1] // Ugly hack #2, when cg site outside of chromosome range, jsut return any gene that will be thrown out in the next step
+                                    }
+                                }
+                            };
+                            results.push(gene);
+                        }
                     }
 
-                    for (i, gene) in genes.iter().enumerate() {
+                    for gene in results.iter() {
                         searched_count += 1;
                         if cg_site_in_gene(&cg, gene) {
+                            last_gene = &gene;
                             place_site(cg, gene, window_size, &mut windows)?;
-                            last_gene = gene;
-                            last_gene_index = i;
                             break;
                         }
                     }
                 }
             }
             println!(
-                "Done with {}! Searched through a total of {} genes, skipped {}",
+                "Done with {}! Searched through a total of {} genes, skipped {} times",
                 filename.to_str().unwrap(),
                 searched_count,
                 skipped_count
             );
             write_windows(windows, output_dir, &filename, window_size as usize)?;
             Ok(())
-        })
+        },
+    )
 }
 
 fn place_site(
@@ -274,9 +331,15 @@ fn place_site(
     window_size: u32,
     windows: &mut Vec<Vec<CgSite>>,
 ) -> Result<()> {
-    let mut percentile = (cg.location - gene.start) * 100 / (gene.end - gene.start);
+    // Offset from start for + strand, offset from end for - strand
+    let offset = match &cg.strand {
+        Strand::Sense => cg.location - gene.start,
+        Strand::Antisense => gene.end - cg.location,
+    };
+
+    let mut percentile = offset * 100 / (gene.end - gene.start);
+    // very unelegant fix but otherwise the last cg-site would land in its own category
     if percentile != 0 {
-        // very unelegant fix but otherwise the last cg-site would land in its own category
         percentile -= 1
     }
     let window = (percentile / window_size) as usize; // integer division rounds down
