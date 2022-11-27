@@ -1,10 +1,10 @@
 use crate::error::Error;
-use clap::Parser;
-use itertools::Itertools;
+use clap::{builder::Str, Parser};
+use itertools::{zip_eq, Itertools};
 use rayon::prelude::*;
 use std::{
     ffi::OsString,
-    fmt::Display,
+    fmt::{format, Display},
     fs::{self, File},
     io::{self, BufRead, Write},
     path::PathBuf,
@@ -50,7 +50,7 @@ struct GbmGene {
     name: String,
     strand: bool, // true for + strand, false for - strand
 }
-
+#[derive(Clone)]
 struct CgSite {
     chromosome: u8,
     location: u32,
@@ -81,7 +81,7 @@ impl CgSite {
                 chromosome: chromosome.parse::<u8>().unwrap(),
                 location: location.parse::<u32>().unwrap(),
                 strand: strand == "+",
-                original: s.to_owned().clone() + "\n",
+                original: s.to_owned().clone(),
             })
     }
 }
@@ -135,22 +135,25 @@ fn main() {
         genes.push(gene)
     }
 
-    let mut max_gene_length: u32 = 0;
-    for gene in &genes {
-        let length = gene.end - gene.start;
-        if length > max_gene_length {
-            max_gene_length = length
+    let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
+    if args.absolute {
+        for gene in &genes {
+            let length = gene.end - gene.start;
+            if length > max_gene_length {
+                max_gene_length = length
+            }
         }
+        println!("The maximum gene length is {} bp", max_gene_length);
     }
-    println!("The maximum gene length is {} bp", max_gene_length);
+    let window_count = (max_gene_length / args.window_size) as usize;
 
     let result = set_up_output_dir(
         &args.output_dir,
-        args.window_size as usize,
         args.force,
-        args.absolute,
-        max_gene_length,
+        window_count,
+        args.window_size as usize,
     );
+
     if let Err(err) = result {
         println!("{}", err);
         return;
@@ -160,7 +163,8 @@ fn main() {
         methylome_files.unwrap(),
         genes,
         args.window_size,
-        args.output_dir,
+        &args.output_dir,
+        window_count,
     );
 
     if let Err(e) = result {
@@ -188,7 +192,8 @@ fn extract_windows(
     methylome_files: Vec<(PathBuf, OsString)>,
     genes: Vec<GbmGene>,
     window_size: u32,
-    output_dir: String,
+    output_dir: &str,
+    window_count: usize,
 ) -> Result<()> {
     methylome_files
         .par_iter()
@@ -196,6 +201,8 @@ fn extract_windows(
             let mut last_gene = &genes[0];
             let mut last_gene_index = 0;
             let mut searched_count: i64 = 0;
+            //   let windows = std::iter::repeat_with(Vec::new()).take(window_count);
+            let mut windows: Vec<Vec<CgSite>> = vec![Vec::new(); window_count];
             println!("Extracting windows for file {:#?} ", filename);
 
             let file = File::open(&path).map_err(|_| {
@@ -221,19 +228,19 @@ fn extract_windows(
                     };
 
                     if cg_site_in_gene(&cg, last_gene) {
-                        place_site(cg, last_gene, window_size, &output_dir, &filename)?;
+                        place_site(cg, last_gene, window_size, &mut windows)?;
                         continue;
                     }
                     let next_gene = &genes[last_gene_index + 1];
                     if cg_site_in_gene(&cg, next_gene) {
-                        place_site(cg, next_gene, window_size, &output_dir, &filename)?;
+                        place_site(cg, next_gene, window_size, &mut windows)?;
                         continue;
                     }
 
                     for (i, gene) in genes.iter().enumerate() {
                         searched_count += 1;
                         if cg_site_in_gene(&cg, gene) {
-                            place_site(cg, gene, window_size, &output_dir, &filename)?;
+                            place_site(cg, gene, window_size, &mut windows)?;
                             last_gene = gene;
                             last_gene_index = i;
                             break;
@@ -242,6 +249,7 @@ fn extract_windows(
                 }
             }
             println!("Searched through a total of {} genes", searched_count);
+            write_windows(windows, output_dir, &filename, window_size as usize)?;
             Ok(())
         })
 }
@@ -250,36 +258,23 @@ fn place_site(
     cg: CgSite,
     gene: &GbmGene,
     window_size: u32,
-    output_dir: &str,
-    filename: &OsString,
+    windows: &mut Vec<Vec<CgSite>>,
 ) -> Result<()> {
     let mut percentile = (cg.location - gene.start) * 100 / (gene.end - gene.start);
     if percentile != 0 {
         // very unelegant fix but otherwise the last cg-site would land in its own category
         percentile -= 1
     }
-    let window = (percentile / window_size) * window_size; // integer division rounds down
-    let output_file = format!("{}/{}/{}", output_dir, window, filename.to_str().unwrap());
-    let mut file = fs::OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(&output_file)
-        .expect(&format!("Could not open output file, {output_file}"));
-    let metadata = file.metadata();
-    if metadata.unwrap().len() == 0 {
-        // On first write to file, create header line
-        file.write("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\n".as_bytes())?;
-    }
-    file.write(cg.original.as_bytes())?;
+    let window = (percentile / window_size) as usize; // integer division rounds down
+    windows[window].push(cg);
     Ok(())
 }
 
 fn set_up_output_dir(
     output_path: &str,
-    window_size: usize,
     overwrite: bool,
-    absolute: bool,
-    max_gene_length: u32,
+    window_count: usize,
+    window_size: usize,
 ) -> Result<()> {
     fs::read_dir(&output_path).map_err(|_| {
         Error::FileError(String::from("Output directory"), String::from(output_path))
@@ -314,8 +309,7 @@ fn set_up_output_dir(
 9_8 10_8
 10_8 11_8",
     );
-    let max = if absolute { max_gene_length } else { 100 };
-    for i in (0..max).step_by(window_size) {
+    for i in 0..window_count {
         let nodelist = format!(
             "filename,node,gen,meth
 /mnt/extStorage/constantin/windows/{i}/methylome_Col0_G0_All.txt,0_0,0,Y
@@ -344,7 +338,7 @@ fn set_up_output_dir(
 "
         );
 
-        let path = format!("{}/{}", &output_path, i);
+        let path = format!("{}/{}", &output_path, i * window_size);
         let window_dir = fs::read_dir(&path);
 
         match window_dir {
@@ -356,6 +350,40 @@ fn set_up_output_dir(
                 fs::write(path.to_owned() + "/edgelist.fn", &edgelist).expect("msg");
             }
         };
+    }
+    Ok(())
+}
+
+fn write_windows(
+    windows: Vec<Vec<CgSite>>,
+    output_dir: &str,
+    filename: &OsString,
+    window_size: usize,
+) -> Result<()> {
+    for (window, cg_sites) in windows.iter().enumerate() {
+        let output_file = format!(
+            "{}/{}/{}",
+            output_dir,
+            window * window_size,
+            filename.to_str().unwrap()
+        );
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&output_file)
+            .expect(&format!("Could not open output file, {output_file}"));
+        let metadata = file.metadata();
+        if metadata.unwrap().len() == 0 {
+            // On first write to file, create header line
+            file.write("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\n".as_bytes())?;
+        }
+        file.write(
+            cg_sites
+                .iter()
+                .map(|e| format!("{}", e))
+                .join("\n")
+                .as_bytes(),
+        )?;
     }
     Ok(())
 }
