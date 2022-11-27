@@ -41,6 +41,10 @@ struct Args {
     /// Use absolute length in basis-pairs for window size instead of percentage of gene length
     #[arg(long, default_value_t = false)]
     absolute: bool,
+
+    /// Match strands? If supplied, only CG sites on the same strand as the gene will be included in the result
+    #[arg(short, long, default_value_t = false)]
+    ignore_strand: bool,
 }
 
 struct GbmGene {
@@ -135,6 +139,8 @@ fn main() {
         genes.push(gene)
     }
 
+    genes.sort_by_key(|g| g.start); // Sort genes by start bp (propably already the case), needed for binary search
+
     let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
     if args.absolute {
         for gene in &genes {
@@ -165,6 +171,7 @@ fn main() {
         args.window_size,
         &args.output_dir,
         window_count,
+        args.ignore_strand,
     );
 
     if let Err(e) = result {
@@ -194,6 +201,7 @@ fn extract_windows(
     window_size: u32,
     output_dir: &str,
     window_count: usize,
+    ignore_strand: bool,
 ) -> Result<()> {
     methylome_files
         .par_iter()
@@ -201,9 +209,9 @@ fn extract_windows(
             let mut last_gene = &genes[0];
             let mut last_gene_index = 0;
             let mut searched_count: i64 = 0;
-            //   let windows = std::iter::repeat_with(Vec::new()).take(window_count);
+            let mut skipped_count: i64 = 0;
             let mut windows: Vec<Vec<CgSite>> = vec![Vec::new(); window_count];
-            println!("Extracting windows for file {:#?} ", filename);
+            println!("Extracting windows for file {:#?}", filename);
 
             let file = File::open(&path).map_err(|_| {
                 Error::FileError(
@@ -212,27 +220,28 @@ fn extract_windows(
                 )
             })?;
             let lines = io::BufReader::new(file).lines();
-
             for (i, line_result) in lines.enumerate() {
-                if i % 50000 == 0 {
+                if i % 100_000 == 0 {
                     println!("Extracting cg_site {i}");
                 }
 
                 if let Ok(line) = line_result {
                     let Some(cg) = CgSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
                     let cg_site_in_gene = |cg: &CgSite, gene: &GbmGene| {
-                        // cg.strand == gene.strand
                         cg.chromosome == gene.chromosome
                             && gene.start <= cg.location
                             && cg.location <= gene.end
+                            && (ignore_strand || cg.strand == gene.strand)
                     };
 
                     if cg_site_in_gene(&cg, last_gene) {
+                        skipped_count += 1;
                         place_site(cg, last_gene, window_size, &mut windows)?;
                         continue;
                     }
                     let next_gene = &genes[last_gene_index + 1];
                     if cg_site_in_gene(&cg, next_gene) {
+                        skipped_count += 1;
                         place_site(cg, next_gene, window_size, &mut windows)?;
                         continue;
                     }
@@ -248,7 +257,12 @@ fn extract_windows(
                     }
                 }
             }
-            println!("Searched through a total of {} genes", searched_count);
+            println!(
+                "Done with {}! Searched through a total of {} genes, skipped {}",
+                filename.to_str().unwrap(),
+                searched_count,
+                skipped_count
+            );
             write_windows(windows, output_dir, &filename, window_size as usize)?;
             Ok(())
         })
@@ -377,13 +391,7 @@ fn write_windows(
             // On first write to file, create header line
             file.write("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\n".as_bytes())?;
         }
-        file.write(
-            cg_sites
-                .iter()
-                .map(|e| format!("{}", e))
-                .join("\n")
-                .as_bytes(),
-        )?;
+        file.write(cg_sites.iter().map(|e| &e.original).join("\n").as_bytes())?;
     }
     Ok(())
 }
