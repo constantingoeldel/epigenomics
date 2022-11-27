@@ -186,7 +186,6 @@ fn main() {
         };
         strand.push(g.to_owned());
     });
-    println!("{:?}", structured_genes[0].sense.len());
 
     let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
     if args.absolute {
