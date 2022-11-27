@@ -53,3 +53,13 @@ Absolute size: Use absolute length in basis-pairs for window size instead of per
 
  `--absolute                   `
 
+Strandness: If supplied, will ignore the strand of the gene when determining where a give gene belongs
+
+`-i, --ignore-strand`
+
+
+## Examples: 
+
+From `/mnt/extStorage/constantin/extractor` run 
+
+`extractor -m ../methylome/within_gbM_genes -a ../gbM_gene_anotation_extract_Arabidopsis.bed -w 5 --force -o ../windows `
