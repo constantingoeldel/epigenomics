@@ -1,6 +1,7 @@
 use crate::{arguments::Args, error::Error};
 use clap::Parser;
 
+use methylation_site::*;
 use rayon::prelude::*;
 use setup::set_up_output_dir;
 use std::{
@@ -10,10 +11,11 @@ use std::{
     path::PathBuf,
 };
 use structs::*;
-use windows::extract_windows;
+use windows::*;
 
 mod arguments;
 mod error;
+mod methylation_site;
 mod setup;
 mod structs;
 mod windows;
@@ -74,7 +76,7 @@ fn main() {
         strand.push(g.to_owned());
     });
 
-    let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
+    let mut max_gene_length: i32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
     if args.absolute {
         for gene in &genes {
             let length = gene.end - gene.start;
@@ -99,37 +101,37 @@ fn main() {
         return;
     }
 
-    // let result = methylome_files.unwrap().par_iter().try_for_each_with(
-    //     structured_genes,
-    //     |genome, (path, filename)| -> Result<()> {
-    //         let file = File::open(&path).map_err(|_| {
-    //             Error::FileError(
-    //                 String::from("methylome file"),
-    //                 String::from(filename.to_str().unwrap()),
-    //             )
-    //         })?;
+    let result = methylome_files.unwrap().par_iter().try_for_each_with(
+        structured_genes,
+        |genome, (path, filename)| -> Result<()> {
+            let file = File::open(&path).map_err(|_| {
+                Error::FileError(
+                    String::from("methylome file"),
+                    String::from(filename.to_str().unwrap()),
+                )
+            })?;
 
-    //         let result = extract_windows(
-    //             file,
-    //             genome.to_vec(),
-    //             args.window_size,
-    //             window_step,
-    //             window_count,
-    //             args.ignore_strand,
-    //         );
+            let result = extract_windows(
+                file,
+                genome.to_vec(),
+                args.window_size,
+                window_step,
+                max_gene_length as i32,
+                args.ignore_strand,
+            );
 
-    //         match result {
-    //             Ok(windows) => windows.save(&args.output_dir, &filename, window_step as usize),
-    //             Err(error) => Err(error),
-    //         }
-    //     },
-    // );
-    // if let Err(err) = result {
-    //     println!("{}", err);
-    //     return;
-    // } else {
-    //     println!("Done!")
-    // }
+            match result {
+                Ok(windows) => windows.save(&args.output_dir, &filename, window_step as usize),
+                Err(error) => Err(error),
+            }
+        },
+    );
+    if let Err(err) = result {
+        println!("{}", err);
+        return;
+    } else {
+        println!("Done!")
+    }
 }
 
 fn lines_from_file(filename: String) -> Result<io::Lines<io::BufReader<File>>> {

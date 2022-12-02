@@ -2,6 +2,8 @@ use std::io;
 
 use thiserror::Error;
 
+use crate::methylation_site::MethylationSite;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Argument error")]
@@ -12,4 +14,7 @@ pub enum Error {
 
     #[error("File error")]
     FileSystemError(#[from] io::Error),
+
+    #[error("No fitting gene found for cg site {0}!")]
+    NoCorrespondingGeneFound(MethylationSite),
 }

@@ -1,23 +1,73 @@
 use std::{
-    fs::File,
-    io::{self, BufRead},
+    fmt::Display,
+    fs::{File, OpenOptions},
+    io::{self, BufRead, Write},
 };
 
+use itertools::Itertools;
+
 use crate::*;
+
+pub type Window = Vec<MethylationSite>;
+#[derive(Debug, PartialEq)]
+pub struct Windows {
+    pub upstream: Vec<Window>,
+    pub gene: Vec<Window>,
+    pub downstream: Vec<Window>,
+}
+
+impl Windows {
+    pub fn new(window_count: usize) -> Self {
+        Windows {
+            upstream: vec![Vec::new(); window_count],
+            gene: vec![Vec::new(); window_count],
+            downstream: vec![Vec::new(); window_count],
+        }
+    }
+    pub fn save(&self, output_dir: &str, filename: &OsString, step: usize) -> Result<()> {
+        for windows in vec![
+            (&self.upstream, "upstream"),
+            (&self.gene, "gene"),
+            (&self.downstream, "downstream"),
+        ]
+        .iter()
+        {
+            for (window, cg_sites) in windows.0.iter().enumerate() {
+                let output_file = format!(
+                    "{}/{}/{}/{}",
+                    output_dir,
+                    windows.1,
+                    window * step,
+                    filename.to_str().unwrap()
+                );
+                let mut file = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&output_file)
+                    .expect(&format!("Could not open output file, {output_file}"));
+                let metadata = file.metadata();
+                if metadata.unwrap().len() == 0 {
+                    // On first write to file, create header line
+                    file.write("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\n".as_bytes())?;
+                }
+                file.write(cg_sites.iter().map(|e| &e.original).join("\n").as_bytes())?;
+            }
+        }
+        Ok(())
+    }
+}
 
 pub fn extract_windows(
     methylome_file: File,
     genome: Vec<GenesByStrand>,
-    window_size: i64,
-    window_step: i64,
-    window_count: usize,
+    window_size: i32,
+    window_step: i32,
+    max_gene_length: i32,
     ignore_strand: bool,
 ) -> Result<Windows> {
-    let mut last_gene = &genome[0].sense[0];
-    // let mut last_gene_index = 0;
-    let mut searched_count: i64 = 0;
-    let mut skipped_count: i64 = 0;
-    let mut windows = Windows::new(window_count);
+    let mut last_gene = genome[0].sense[0].clone();
+
+    let mut windows = Windows::new((max_gene_length / window_step) as usize);
 
     let lines = io::BufReader::new(methylome_file).lines();
     for (i, line_result) in lines.enumerate() {
@@ -26,146 +76,22 @@ pub fn extract_windows(
                 println!("Done with methylation site {i}");
             }
 
-            let Some(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;}; // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
-            let cg_site_in_gene = |cg: &MethylationSite, gene: &Gene| {
-                cg.chromosome == gene.chromosome
-                    && gene.start <= cg.location
-                    && cg.location <= gene.end
-                    && (ignore_strand || cg.strand == gene.strand)
-            };
-
-            if cg_site_in_gene(&cg, last_gene) {
-                skipped_count += 1;
-                place_site(&cg, last_gene, window_size, window_step, &mut windows)?;
-                continue;
-            }
-
-            let mut results: Vec<&Gene> = Vec::new(); // Collection of closest genes on all chromosomes and strands
-            for chromosome in genome.iter() {
-                for strand in [&chromosome.sense, &chromosome.antisense] {
-                    let result = strand.binary_search_by_key(&cg.location, |gene| gene.start);
-
-                    let gene = match result {
-                        Ok(i) => &strand[i],
-                        Err(i) => {
-                            if strand.len() > i + 1 {
-                                &strand[i + 1]
-                            } else {
-                                &strand[i - 1] // Ugly hack #2, when cg site outside of chromosome range, jsut return any gene that will be thrown out in the next step
-                            }
-                        }
-                    };
-                    results.push(gene);
-                }
-            }
-
-            for gene in results.iter() {
-                searched_count += 1;
-                if cg_site_in_gene(&cg, gene) {
-                    last_gene = &gene;
-                    place_site(&cg, gene, window_size, window_step, &mut windows)?;
-                    break;
-                }
-            }
+            // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
+            let Some(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;};
+            let gene = cg.find_gene(&genome, &last_gene, ignore_strand)?;
+            last_gene = gene.clone();
+            cg.place_in_windows(&gene, window_size, window_step, &mut windows)?;
         }
     }
-    println!(
-        "Done! Searched through a total of {} genes, skipped {} times",
-        searched_count, skipped_count
-    );
     Ok(windows)
 }
 
-fn place_site(
-    cg: &MethylationSite,
-    gene: &Gene,
-    window_size: i64,
-    window_step: i64,
-    windows: &mut Windows,
-) -> Result<()> {
-    let gene_length = (gene.end - gene.start) as i64;
-    // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
-    let offset: i64 = match &cg.strand {
-        Strand::Sense => (cg.location - gene.start) as i64,
-        Strand::Antisense => (gene.end - cg.location) as i64,
-    };
-
-    let normalized_offset = offset.abs() % gene_length;
-
-    for window in (0..100).step_by(window_step as usize) {
-        if normalized_offset > window * window_step
-            && normalized_offset < window * window_step + window_size
-        {
-            // Clone necessary as each site can be part of multiple windows if step of sliding window < window size
-            if offset < 0 {
-                windows.upstream[((window - 1) * -1) as usize].push(cg.clone())
-            } else if offset / gene_length >= 1 {
-                windows.downstream[(window - 100) as usize].push(cg.clone())
-            } else {
-                windows.gene[window as usize].push(cg.clone())
-            }
-        }
+impl Display for Windows {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Upstream: {:?}\n\nGene: {:?}\n\nDownstream: {:?}\n\n",
+            self.upstream, self.gene, self.downstream
+        )
     }
-
-    Ok(())
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::{extract_windows, place_site};
-//     use crate::{structs::Windows, *};
-
-//     #[test]
-//     fn test_place_site() {
-//         const WINDOW_SIZE: u32 = 5;
-
-//         let mut windows = Windows::new(20);
-
-//         let cg_a = MethylationSite {
-//             chromosome: 1,
-//             location: 80,
-//             strand: Strand::Sense,
-//             original: String::new(),
-//         };
-//         let cg_b = MethylationSite {
-//             chromosome: 1,
-//             location: 100,
-//             strand: Strand::Sense,
-//             original: String::new(),
-//         };
-//         let cg_c = MethylationSite {
-//             chromosome: 1,
-//             location: 123,
-//             strand: Strand::Sense,
-//             original: String::new(),
-//         };
-//         let cg_d = MethylationSite {
-//             chromosome: 1,
-//             location: 200,
-//             strand: Strand::Sense,
-//             original: String::new(),
-//         };
-//         let cg_e = MethylationSite {
-//             chromosome: 1,
-//             location: 220,
-//             strand: Strand::Sense,
-//             original: String::new(),
-//         };
-
-//         let gene = Gene {
-//             chromosome: 1,
-//             start: 100,
-//             end: 200,
-//             strand: Strand::Sense,
-//             name: String::new(),
-//         };
-
-//         assert_eq!(
-//             place_site(&cg, &gene, WINDOW_SIZE, &mut windows).unwrap(),
-//             ()
-//         );
-//         assert!(windows[3].contains(&cg))
-//         // assert_eq!(calculate_total(10, 10), 20);
-//         // assert_eq!(calculate_total(-5, 10), 5);
-//     }
-// }

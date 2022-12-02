@@ -7,8 +7,8 @@ pub fn set_up_output_dir(
     overwrite: bool,
     window_step: usize,
     absolute: bool,
-    cutoff: u32,
-    max_gene_length: u32,
+    cutoff: i32,
+    max_gene_length: i32,
 ) -> Result<()> {
     fs::read_dir(&output_path).map_err(|_| {
         Error::FileError(String::from("Output directory"), String::from(output_path))

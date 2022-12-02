@@ -14,11 +14,11 @@ pub struct Args {
 
     /// Size of the window in percent of the gbM-gene length or in basepair number if --absolute is supplied
     #[arg(short, long, default_value_t = 5)]
-    pub window_size: i64,
+    pub window_size: i32,
 
     /// Size of the step between the start of each window. Default value is window-size, so no overlapp happens
     #[arg(long, short('s'))]
-    pub window_step: Option<i64>,
+    pub window_step: Option<i32>,
 
     /// Path of the directory where extracted segments shall be stored
     #[arg(short, long)]
@@ -38,5 +38,5 @@ pub struct Args {
 
     /// Number of basepairs to include upstream and downstream of gene
     #[arg(short, long, default_value_t = 2048)]
-    pub cutoff: u32,
+    pub cutoff: i32,
 }
