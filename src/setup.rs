@@ -10,13 +10,12 @@ pub fn set_up_output_dir(
     cutoff: i32,
     max_gene_length: i32,
 ) -> Result<()> {
-    fs::read_dir(&output_path).map_err(|_| {
-        Error::FileError(String::from("Output directory"), String::from(output_path))
-    })?; // Throw error if base output dir does not exist
+    fs::read_dir(output_path)
+        .map_err(|_| Error::File(String::from("Output directory"), String::from(output_path)))?; // Throw error if base output dir does not exist
 
     if overwrite {
-        fs::remove_dir_all(&output_path).unwrap();
-        fs::create_dir(&output_path).unwrap();
+        fs::remove_dir_all(output_path).unwrap();
+        fs::create_dir(output_path).unwrap();
     }
     let edgelist = String::from(
         "from to

@@ -104,8 +104,8 @@ fn main() {
     let result = methylome_files.unwrap().par_iter().try_for_each_with(
         structured_genes,
         |genome, (path, filename)| -> Result<()> {
-            let file = File::open(&path).map_err(|_| {
-                Error::FileError(
+            let file = File::open(path).map_err(|_| {
+                Error::File(
                     String::from("methylome file"),
                     String::from(filename.to_str().unwrap()),
                 )
@@ -118,17 +118,16 @@ fn main() {
                 window_step,
                 max_gene_length as i32,
                 args.ignore_strand,
+                args.cutoff,
             );
-
             match result {
-                Ok(windows) => windows.save(&args.output_dir, &filename, window_step as usize),
+                Ok(windows) => windows.save(&args.output_dir, filename, window_step as usize),
                 Err(error) => Err(error),
             }
         },
     );
     if let Err(err) = result {
-        println!("{}", err);
-        return;
+        println!("{}", err)
     } else {
         println!("Done!")
     }
@@ -136,13 +135,13 @@ fn main() {
 
 fn lines_from_file(filename: String) -> Result<io::Lines<io::BufReader<File>>> {
     let file = File::open(&filename)
-        .map_err(|_| Error::FileError(String::from("Annotation file"), String::from(filename)))?;
+        .map_err(|_| Error::File(String::from("Annotation file"), filename))?;
     Ok(io::BufReader::new(file).lines())
 }
 
 fn load_methylome(methylome: String) -> Result<Vec<(PathBuf, OsString)>> {
     let methylome_dir = fs::read_dir(&methylome)
-        .map_err(|_| Error::FileError(String::from("Methylome directory"), methylome.clone()))?;
+        .map_err(|_| Error::File(String::from("Methylome directory"), methylome.clone()))?;
     let methylome_files = methylome_dir
         .map(|f| (f.as_ref().unwrap().path(), f.unwrap().file_name()))
         .collect();

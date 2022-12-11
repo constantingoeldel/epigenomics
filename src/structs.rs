@@ -6,13 +6,13 @@ use crate::error;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Strand {
     Sense,
     Antisense,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Gene {
     pub chromosome: u8,
     pub start: i32,

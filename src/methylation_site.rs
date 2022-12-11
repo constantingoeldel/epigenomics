@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::*;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MethylationSite {
     pub chromosome: u8,
     pub location: i32,
@@ -16,7 +16,7 @@ impl MethylationSite {
     pub fn from_methylome_file_line(s: &str) -> Option<Self> {
         s.split('\t')
             .collect_tuple()
-            .filter(|(chromosome, _, _, _, _, _, _, _, _)| chromosome != &"seqnames") // Filter out header row
+            .filter(|(_, _, _, context, _, _, _, _, _)| context == &"CG")
             .map(
                 |(chromosome, location, strand, _, _, _, _, _, _)| MethylationSite {
                     chromosome: chromosome.parse::<u8>().unwrap(),
@@ -26,52 +26,44 @@ impl MethylationSite {
                     } else {
                         Strand::Antisense
                     },
-                    original: s.to_owned().clone(),
+                    original: s.to_owned(),
                 },
             )
     }
-    fn is_in_gene(&self, gene: &Gene, ignore_strand: bool) -> bool {
+    pub fn is_in_gene(&self, gene: &Gene, ignore_strand: bool, cutoff: i32) -> bool {
         self.chromosome == gene.chromosome
-            && gene.start <= self.location
-            && self.location <= gene.end
+            && gene.start <= self.location + cutoff
+            && self.location <= gene.end + cutoff
             && (ignore_strand || self.strand == gene.strand)
     }
 
-    pub fn find_gene(
-        &self,
-        genome: &Vec<GenesByStrand>,
-        last_gene: &Gene,
+    pub fn find_gene<'a>(
+        &'a self,
+        genome: &'a Vec<GenesByStrand>,
         ignore_strand: bool,
-    ) -> Result<Gene> {
-        if self.is_in_gene(last_gene, ignore_strand) {
-            return Ok(last_gene.clone());
-        }
-
-        let mut results: Vec<&Gene> = Vec::new(); // Collection of closest genes on all chromosomes and strands
-        for chromosome in genome.iter() {
-            for strand in [&chromosome.sense, &chromosome.antisense] {
-                let result = strand.binary_search_by_key(&self.location, |gene| gene.start);
-
-                let gene = match result {
-                    Ok(i) => &strand[i],
-                    Err(i) => {
-                        if strand.len() > i + 1 {
-                            &strand[i]
-                        } else {
-                            &strand[i - 1] // Ugly hack #2, when cg site outside of chromosome range, jsut return any gene that will be thrown out in the next step
-                        }
-                    }
-                };
-                results.push(gene);
+        cutoff: i32,
+    ) -> Option<&Gene> {
+        let chromosome = &genome[(self.chromosome - 1) as usize];
+        let strand = match self.strand {
+            Strand::Sense => &chromosome.sense,
+            Strand::Antisense => &chromosome.antisense,
+        };
+        let result = strand.binary_search_by_key(&self.location, |gene| gene.end + cutoff);
+        let gene = match result {
+            Ok(i) => &strand[i],
+            Err(i) => {
+                if strand.len() > i + 1 {
+                    &strand[i]
+                } else {
+                    &strand[i - 1] // Ugly hack #2, when cg site outside of chromosome range, jsut return any gene that will be thrown out in the next step
+                }
             }
-        }
-        for gene in results {
-            if self.is_in_gene(gene, ignore_strand) {
-                return Ok(gene.clone());
-            }
+        };
+        if self.is_in_gene(gene, ignore_strand, cutoff) {
+            return Some(gene);
         }
 
-        Err(Error::NoCorrespondingGeneFound(self.to_owned()))
+        None
     }
 
     pub fn place_in_windows(
@@ -99,11 +91,6 @@ impl MethylationSite {
             if normalized_offset >= window * window_step
                 && normalized_offset <= window * window_step + window_size
             {
-                println!(
-                    "{gene_length}, {offset}, {normalized_offset}, {}, {}  ",
-                    window * window_step,
-                    window * window_step + window_size
-                );
                 // Clone necessary as each site can be part of multiple windows if step of sliding window < window size
                 if offset < 0 {
                     windows.upstream[(window) as usize].push(self.clone())
@@ -114,7 +101,6 @@ impl MethylationSite {
                 }
             }
         }
-
         Ok(())
     }
 }
@@ -131,7 +117,7 @@ mod tests {
     fn test_place_site() {
         const WINDOW_SIZE: i32 = 2;
 
-        let mut windows = Windows::new(100 as usize);
+        let mut windows = Windows::new(100_usize);
 
         let cg_a = MethylationSite {
             chromosome: 1,
