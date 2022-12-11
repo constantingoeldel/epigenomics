@@ -67,6 +67,7 @@ pub fn extract_windows(
     max_gene_length: i32,
     ignore_strand: bool,
     cutoff: i32,
+    absolute: bool,
 ) -> Result<Windows> {
     let mut last_gene: Gene = genome[0].sense[0].clone();
 
@@ -83,13 +84,13 @@ pub fn extract_windows(
             // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
             let Some(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;};
             if cg.is_in_gene(&last_gene, ignore_strand, cutoff) {
-                cg.place_in_windows(&last_gene, window_size, window_step, &mut windows)?;
+                cg.place_in_windows(&last_gene, window_size, window_step, &mut windows, absolute)?;
                 continue;
             }
             let gene = cg.find_gene(&genome, ignore_strand, cutoff);
             if let Some(gene) = gene {
                 last_gene = gene.clone();
-                cg.place_in_windows(gene, window_size, window_step, &mut windows)?;
+                cg.place_in_windows(gene, window_size, window_step, &mut windows, absolute)?;
             }
         }
     }

@@ -119,6 +119,7 @@ fn main() {
                 max_gene_length as i32,
                 args.ignore_strand,
                 args.cutoff,
+                args.absolute,
             );
             match result {
                 Ok(windows) => windows.save(&args.output_dir, filename, window_step as usize),

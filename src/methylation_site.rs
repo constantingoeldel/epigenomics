@@ -72,6 +72,7 @@ impl MethylationSite {
         window_size: i32,
         window_step: i32,
         windows: &mut Windows,
+        absolute: bool,
     ) -> Result<()> {
         let gene_length = gene.end - gene.start;
         // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
@@ -80,21 +81,31 @@ impl MethylationSite {
             Strand::Antisense => gene.end - self.location,
         };
 
-        let mut normalized_offset = offset.abs() % (gene_length);
-
-        if offset == gene_length {
-            normalized_offset = 100
+        let max = if absolute { gene_length } else { 100 };
+        let mut normalized_offset = (offset.abs() % (gene_length)) as f32; // In basepairs, absolute distance to 5'
+        if !absolute && offset < 0 || offset > max {
+            // CGs at the end of the 2kb should be placed in the last window of upstream/downstream if in relative mode, even if the gene is longer/shorter than 2kb
+            normalized_offset *= gene_length as f32 / 2048_f32
         }
 
-        // TODO update for abolute values
-        for window in 0..100 / window_step {
+        if offset == gene_length {
+            normalized_offset = max as f32
+        }
+
+        for window in 0..max / window_step {
             if normalized_offset >= window * window_step
                 && normalized_offset <= window * window_step + window_size
+            // Check that site is in window
             {
                 // Clone necessary as each site can be part of multiple windows if step of sliding window < window size
                 if offset < 0 {
                     windows.upstream[(window) as usize].push(self.clone())
-                } else if offset > 100 {
+                } else if offset > max {
+                    println!(
+                        "{}, {}",
+                        window * window_step + window_size,
+                        normalized_offset
+                    );
                     windows.downstream[(window) as usize].push(self.clone())
                 } else {
                     windows.gene[window as usize].push(self.clone())
@@ -164,17 +175,17 @@ mod tests {
             name: String::new(),
         };
 
-        cg_a.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows)
+        cg_a.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, false)
             .unwrap();
-        cg_b.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows)
+        cg_b.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, false)
             .unwrap();
-        cg_c.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows)
+        cg_c.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, false)
             .unwrap();
-        cg_d.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows)
+        cg_d.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, false)
             .unwrap();
-        cg_e.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows)
+        cg_e.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, false)
             .unwrap();
-        cg_f.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows)
+        cg_f.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, false)
             .unwrap();
 
         println!("{}", windows);
@@ -192,6 +203,84 @@ mod tests {
         assert!(windows.downstream[18].contains(&cg_f));
         assert!(windows.downstream[19].contains(&cg_f));
         assert!(windows.downstream[20].contains(&cg_f));
+    }
+    #[test]
+    fn test_place_site_absolute() {
+        const WINDOW_SIZE: i32 = 10;
+
+        let mut windows = Windows::new(20_usize);
+
+        let cg_a = MethylationSite {
+            chromosome: 1,
+            location: 80,
+            strand: Strand::Sense,
+            original: String::new(),
+        };
+        let cg_b = MethylationSite {
+            chromosome: 1,
+            location: 100,
+            strand: Strand::Sense,
+            original: String::new(),
+        };
+        let cg_c = MethylationSite {
+            chromosome: 1,
+            location: 123,
+            strand: Strand::Sense,
+            original: String::new(),
+        };
+        let cg_d = MethylationSite {
+            chromosome: 1,
+            location: 200,
+            strand: Strand::Sense,
+            original: String::new(),
+        };
+        let cg_e = MethylationSite {
+            chromosome: 1,
+            location: 201,
+            strand: Strand::Sense,
+            original: String::new(),
+        };
+        let cg_f = MethylationSite {
+            chromosome: 1,
+            location: 220,
+            strand: Strand::Sense,
+            original: String::new(),
+        };
+
+        let gene = Gene {
+            chromosome: 1,
+            start: 100,
+            end: 200,
+            strand: Strand::Sense,
+            name: String::new(),
+        };
+
+        cg_a.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, true)
+            .unwrap();
+        cg_b.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, true)
+            .unwrap();
+        cg_c.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, true)
+            .unwrap();
+        cg_d.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, true)
+            .unwrap();
+        cg_e.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, true)
+            .unwrap();
+        cg_f.place_in_windows(&gene, WINDOW_SIZE, WINDOW_SIZE / 2, &mut windows, true)
+            .unwrap();
+
+        println!("{}", windows);
+        assert!(windows.upstream[2].contains(&cg_a));
+        assert!(windows.upstream[3].contains(&cg_a));
+        assert!(windows.upstream[4].contains(&cg_a));
+        assert!(windows.gene[0].contains(&cg_b));
+        assert!(windows.gene[3].contains(&cg_c));
+        assert!(windows.gene[4].contains(&cg_c));
+        assert!(windows.gene[18].contains(&cg_d));
+        assert!(windows.gene[19].contains(&cg_d));
+        assert!(windows.downstream[0].contains(&cg_e));
+        assert!(windows.downstream[2].contains(&cg_f));
+        assert!(windows.downstream[3].contains(&cg_f));
+        assert!(windows.downstream[4].contains(&cg_f));
     }
 }
 
