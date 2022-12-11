@@ -17,11 +17,22 @@ pub struct Windows {
 }
 
 impl Windows {
-    pub fn new(window_count: usize) -> Self {
+    pub fn new(max_gene_length: i32, args: &Args) -> Self {
+        let gene_window_count = if args.absolute {
+            max_gene_length / args.window_step
+        } else {
+            100
+        };
+        let up_down_window_count = if args.absolute {
+            args.cutoff / args.window_step
+        } else {
+            100
+        };
+        println!("{gene_window_count}: {up_down_window_count}");
         Windows {
-            upstream: vec![Vec::new(); window_count],
-            gene: vec![Vec::new(); window_count],
-            downstream: vec![Vec::new(); window_count],
+            upstream: vec![Vec::new(); up_down_window_count as usize],
+            gene: vec![Vec::new(); gene_window_count as usize],
+            downstream: vec![Vec::new(); up_down_window_count as usize],
         }
     }
     pub fn save(&self, output_dir: &str, filename: &OsString, step: usize) -> Result<()> {
@@ -40,6 +51,7 @@ impl Windows {
                     window * step,
                     filename.to_str().unwrap()
                 );
+                println!("{output_file}");
                 let mut file = OpenOptions::new()
                     .append(true)
                     .create(true)
@@ -62,16 +74,12 @@ impl Windows {
 pub fn extract_windows(
     methylome_file: File,
     genome: Vec<GenesByStrand>,
-    window_size: i32,
-    window_step: i32,
     max_gene_length: i32,
-    ignore_strand: bool,
-    cutoff: i32,
-    absolute: bool,
+    args: Args,
 ) -> Result<Windows> {
     let mut last_gene: Gene = genome[0].sense[0].clone();
 
-    let mut windows = Windows::new((max_gene_length / window_step) as usize);
+    let mut windows = Windows::new(max_gene_length, &args);
 
     let lines = io::BufReader::new(methylome_file).lines();
     for (i, line_result) in lines.enumerate().skip(1) {
@@ -83,14 +91,15 @@ pub fn extract_windows(
 
             // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
             let Some(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;};
-            if cg.is_in_gene(&last_gene, ignore_strand, cutoff) {
-                cg.place_in_windows(&last_gene, window_size, window_step, &mut windows, absolute)?;
+
+            if cg.is_in_gene(&last_gene, args.ignore_strand, args.cutoff) {
+                cg.place_in_windows(&last_gene, &mut windows, &args)?;
                 continue;
             }
-            let gene = cg.find_gene(&genome, ignore_strand, cutoff);
+            let gene = cg.find_gene(&genome, args.ignore_strand, args.cutoff);
             if let Some(gene) = gene {
                 last_gene = gene.clone();
-                cg.place_in_windows(gene, window_size, window_step, &mut windows, absolute)?;
+                cg.place_in_windows(gene, &mut windows, &args)?;
             }
         }
     }

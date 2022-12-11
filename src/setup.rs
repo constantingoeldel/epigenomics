@@ -1,21 +1,18 @@
 use std::fs;
 
-use crate::{error::Error, Result};
+use crate::*;
 
-pub fn set_up_output_dir(
-    output_path: &str,
-    overwrite: bool,
-    window_step: usize,
-    absolute: bool,
-    cutoff: i32,
-    max_gene_length: i32,
-) -> Result<()> {
-    fs::read_dir(output_path)
-        .map_err(|_| Error::File(String::from("Output directory"), String::from(output_path)))?; // Throw error if base output dir does not exist
+pub fn set_up_output_dir(max_gene_length: i32, args: Args) -> Result<()> {
+    fs::read_dir(&args.output_dir).map_err(|_| {
+        Error::File(
+            String::from("Output directory"),
+            String::from(&args.output_dir),
+        )
+    })?; // Throw error if base output dir does not exist
 
-    if overwrite {
-        fs::remove_dir_all(output_path).unwrap();
-        fs::create_dir(output_path).unwrap();
+    if args.force {
+        fs::remove_dir_all(&args.output_dir).unwrap();
+        fs::create_dir(&args.output_dir).unwrap();
     }
     let edgelist = String::from(
         "from to
@@ -44,16 +41,16 @@ pub fn set_up_output_dir(
     );
 
     let sides = vec![
-        ("upstream", cutoff),
+        ("upstream", args.cutoff),
         ("gene", max_gene_length),
-        ("downstream", cutoff),
+        ("downstream", args.cutoff),
     ];
 
     for side in sides {
-        let max = if absolute { side.1 } else { 100 };
+        let max = if args.absolute { side.1 } else { 100 };
         let side = side.0;
 
-        for window in (0..max).step_by(window_step) {
+        for window in (0..=max).step_by(args.window_step as usize) {
             let nodelist = format!(
                 "filename,node,gen,meth
 /mnt/extStorage/constantin/windows/{side}/{window}/methylome_Col0_G0_All.txt,0_0,0,Y
@@ -82,7 +79,7 @@ pub fn set_up_output_dir(
 "
             );
 
-            let path = format!("{}/{}/{}", &output_path, side, window);
+            let path = format!("{}/{}/{}", args.output_dir, side, window);
             let window_dir = fs::read_dir(&path);
 
             match window_dir {

@@ -1,7 +1,7 @@
 use clap::Parser;
 
 /// simple tool to separate a methylome by position within a gene
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Path of directory containing the methlyome files from which to extract the CG-sites
@@ -17,8 +17,8 @@ pub struct Args {
     pub window_size: i32,
 
     /// Size of the step between the start of each window. Default value is window-size, so no overlapp happens
-    #[arg(long, short('s'))]
-    pub window_step: Option<i32>,
+    #[arg(long, short('s'), default_value_t = 0)]
+    pub window_step: i32,
 
     /// Path of the directory where extracted segments shall be stored
     #[arg(short, long)]

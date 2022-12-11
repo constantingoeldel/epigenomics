@@ -21,22 +21,21 @@ mod structs;
 mod windows;
 
 fn main() {
-    let args = Args::parse();
+    let mut args = Args::parse();
 
-    let window_step = if args.window_step.is_some() {
-        args.window_step.unwrap()
-    } else {
-        args.window_size
-    };
+    if args.window_step == 0 {
+        // Adjust window_step to default value
+        args.window_step = args.window_size;
+    }
 
-    let methylome_files = load_methylome(args.methylome);
+    let methylome_files = load_methylome(&args.methylome);
 
     if let Err(err) = methylome_files {
         println!("{}", err);
         return;
     }
 
-    let annotation_lines = lines_from_file(args.genome);
+    let annotation_lines = lines_from_file(&args.genome);
 
     if let Err(err) = annotation_lines {
         println!("{}", err);
@@ -87,14 +86,7 @@ fn main() {
         println!("The maximum gene length is {} bp", max_gene_length);
     }
 
-    let result = set_up_output_dir(
-        &args.output_dir,
-        args.force,
-        window_step as usize,
-        args.absolute,
-        args.cutoff,
-        max_gene_length,
-    );
+    let result = set_up_output_dir(max_gene_length, args.clone());
 
     if let Err(err) = result {
         println!("{}", err);
@@ -111,18 +103,10 @@ fn main() {
                 )
             })?;
 
-            let result = extract_windows(
-                file,
-                genome.to_vec(),
-                args.window_size,
-                window_step,
-                max_gene_length as i32,
-                args.ignore_strand,
-                args.cutoff,
-                args.absolute,
-            );
+            let result =
+                extract_windows(file, genome.to_vec(), max_gene_length as i32, args.clone());
             match result {
-                Ok(windows) => windows.save(&args.output_dir, filename, window_step as usize),
+                Ok(windows) => windows.save(&args.output_dir, filename, args.window_step as usize),
                 Err(error) => Err(error),
             }
         },
@@ -134,15 +118,15 @@ fn main() {
     }
 }
 
-fn lines_from_file(filename: String) -> Result<io::Lines<io::BufReader<File>>> {
-    let file = File::open(&filename)
-        .map_err(|_| Error::File(String::from("Annotation file"), filename))?;
+fn lines_from_file(filename: &str) -> Result<io::Lines<io::BufReader<File>>> {
+    let file = File::open(filename)
+        .map_err(|_| Error::File(String::from("Annotation file"), String::from(filename)))?;
     Ok(io::BufReader::new(file).lines())
 }
 
-fn load_methylome(methylome: String) -> Result<Vec<(PathBuf, OsString)>> {
-    let methylome_dir = fs::read_dir(&methylome)
-        .map_err(|_| Error::File(String::from("Methylome directory"), methylome.clone()))?;
+fn load_methylome(methylome: &str) -> Result<Vec<(PathBuf, OsString)>> {
+    let methylome_dir = fs::read_dir(methylome)
+        .map_err(|_| Error::File(String::from("Methylome directory"), String::from(methylome)))?;
     let methylome_files = methylome_dir
         .map(|f| (f.as_ref().unwrap().path(), f.unwrap().file_name()))
         .collect();
