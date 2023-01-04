@@ -12,7 +12,14 @@ pub enum Strand {
     Antisense,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
+pub enum Location {
+    Upstream,
+    Gene,
+    Downstream,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Gene {
     pub chromosome: u8,
     pub start: i32,
@@ -25,6 +32,27 @@ pub struct Gene {
 pub struct GenesByStrand {
     pub sense: Vec<Gene>,
     pub antisense: Vec<Gene>,
+}
+
+impl GenesByStrand {
+    pub fn new() -> Self {
+        GenesByStrand {
+            sense: Vec::new(),
+            antisense: Vec::new(),
+        }
+    }
+
+    pub fn insert(&mut self, gene: Gene) {
+        match gene.strand {
+            Strand::Sense => self.sense.push(gene),
+            Strand::Antisense => self.antisense.push(gene),
+        }
+    }
+
+    pub fn sort(&mut self) {
+        self.sense.sort_by(|a, b| a.start.cmp(&b.start));
+        self.antisense.sort_by(|a, b| a.start.cmp(&b.start));
+    }
 }
 
 impl Gene {

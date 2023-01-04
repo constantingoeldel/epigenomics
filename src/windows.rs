@@ -51,7 +51,6 @@ impl Windows {
                     window * step,
                     filename.to_str().unwrap()
                 );
-                println!("{output_file}");
                 let mut file = OpenOptions::new()
                     .append(true)
                     .create(true)
@@ -77,7 +76,7 @@ pub fn extract_windows(
     max_gene_length: i32,
     args: Args,
 ) -> Result<Windows> {
-    let mut last_gene: Gene = genome[0].sense[0].clone();
+    let mut last_gene: Option<&Gene> = None;
 
     let mut windows = Windows::new(max_gene_length, &args);
 
@@ -89,17 +88,15 @@ pub fn extract_windows(
                 println!("Done with methylation site {i} ");
             }
 
-            // If cg site could not be extracted, continue with the next line. Happens on header rows, for example.
-            let Some(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;};
+            // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
+            let Ok(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;};
 
-            if cg.is_in_gene(&last_gene, args.ignore_strand, args.cutoff) {
-                cg.place_in_windows(&last_gene, &mut windows, &args)?;
-                continue;
+            if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
+                last_gene = cg.find_gene(&genome, args.cutoff);
             }
-            let gene = cg.find_gene(&genome, args.ignore_strand, args.cutoff);
-            if let Some(gene) = gene {
-                last_gene = gene.clone();
-                cg.place_in_windows(gene, &mut windows, &args)?;
+            if let Some(gene) = last_gene {
+                cg.place_in_windows(gene, &mut windows, &args);
+                continue;
             }
         }
     }

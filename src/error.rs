@@ -2,8 +2,6 @@ use std::io;
 
 use thiserror::Error;
 
-// use crate::methylation_site::MethylationSite;
-
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Argument error")]
@@ -14,6 +12,10 @@ pub enum Error {
 
     #[error("File error {0}")]
     FileSystem(#[from] io::Error),
-    //#[error("No fitting gene found for cg site {0}!")]
-    //NoCorrespondingGeneFound(MethylationSite),
+
+    #[error("Unable to extract CG site from line")]
+    CGSite,
+
+    #[error("Unable to convert: Are you passing a valid number? {0}")]
+    NumberConversion(#[from] std::num::ParseIntError),
 }

@@ -24,17 +24,9 @@ pub struct Args {
     #[arg(short, long)]
     pub output_dir: String,
 
-    /// Overwrite current content of the output directory?
-    #[arg(short, long, default_value_t = false)]
-    pub force: bool,
-
     /// Use absolute length in base-pairs for window size instead of percentage of gene length
     #[arg(short, long, default_value_t = false)]
     pub absolute: bool,
-
-    /// Match strands? If supplied, only CG sites on the same strand as the gene will be included in the result
-    #[arg(short, long, default_value_t = false)]
-    pub ignore_strand: bool,
 
     /// Number of basepairs to include upstream and downstream of gene
     #[arg(short, long, default_value_t = 2048)]
