@@ -12,8 +12,8 @@ pub enum Strand {
     Antisense,
 }
 
-#[derive(Debug)]
-pub enum Location {
+#[derive(Debug, Clone)]
+pub enum Region {
     Upstream,
     Gene,
     Downstream,

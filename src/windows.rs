@@ -35,6 +35,20 @@ impl Windows {
             downstream: vec![Vec::new(); up_down_window_count as usize],
         }
     }
+    pub fn get(&self, region: Region) -> &Vec<Window> {
+        match region {
+            Region::Upstream => &self.upstream,
+            Region::Gene => &self.gene,
+            Region::Downstream => &self.downstream,
+        }
+    }
+    pub fn get_mut<'a>(&'a mut self, location: &Region) -> &'a mut Vec<Window> {
+        match location {
+            Region::Upstream => &mut self.upstream,
+            Region::Gene => &mut self.gene,
+            Region::Downstream => &mut self.downstream,
+        }
+    }
     pub fn save(&self, output_dir: &str, filename: &OsString, step: usize) -> Result<()> {
         for windows in vec![
             (&self.upstream, "upstream"),
