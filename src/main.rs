@@ -88,11 +88,20 @@ fn main() -> Result<()> {
 
     methylome_files.par_iter().try_for_each_with(
         structured_genes,
-        |genome, (path, filename)| {
+        |genome, (path, filename)| -> Result<()> {
             let file = open_file(path, filename)?;
             let windows =
                 extract_windows(file, genome.to_vec(), max_gene_length as i32, args.clone())?;
-            windows.save(&args.output_dir, filename, args.window_step as usize)
+            windows.save(&args.output_dir, filename, args.window_step as usize)?;
+            let distribution = windows.distribution();
+            let path = format!(
+                "{}/{}_distribution.txt",
+                &args.output_dir,
+                filename.to_str().unwrap()
+            );
+            println!("Saving distribution to {}", path);
+            fs::write(path, distribution)?;
+            Ok(())
         },
     )?;
 

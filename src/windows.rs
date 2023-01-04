@@ -28,7 +28,6 @@ impl Windows {
         } else {
             100
         };
-        println!("{gene_window_count}: {up_down_window_count}");
         Windows {
             upstream: vec![Vec::new(); up_down_window_count as usize],
             gene: vec![Vec::new(); gene_window_count as usize],
@@ -49,6 +48,35 @@ impl Windows {
             Region::Downstream => &mut self.downstream,
         }
     }
+    pub fn distribution(&self) -> String {
+        // In CSV format
+        let mut output = String::new();
+        output += "Upstream\n";
+        for (i, window) in self.upstream.iter().enumerate() {
+            output.push_str(&format!("{},{}\n", i, window.len()));
+        }
+        output += "Gene\n";
+        for (i, window) in self.gene.iter().enumerate() {
+            output.push_str(&format!("{},{}\n", i, window.len()));
+        }
+        output += "Downstream\n";
+        for (i, window) in self.downstream.iter().enumerate() {
+            output.push_str(&format!("{},{}\n", i, window.len()));
+        }
+        output += "Combined\n";
+        for (i, window) in self
+            .upstream
+            .iter()
+            .chain(self.gene.iter())
+            .chain(self.downstream.iter())
+            .enumerate()
+        {
+            output.push_str(&format!("{},{}\n", i, window.len()));
+        }
+
+        output
+    }
+
     pub fn save(&self, output_dir: &str, filename: &OsString, step: usize) -> Result<()> {
         for windows in vec![
             (&self.upstream, "upstream"),
@@ -65,13 +93,12 @@ impl Windows {
                     window * step,
                     filename.to_str().unwrap()
                 );
+                println!("Saving to {}", output_file);
                 let mut file = OpenOptions::new()
                     .append(true)
                     .create(true)
                     .open(&output_file)?;
-                // .map_err(|_| {
-                //     Error::File(output_file, output_dir.to_owned());
-                // })?;
+
                 let metadata = file.metadata();
                 if metadata.unwrap().len() == 0 {
                     // On first write to file, create header line

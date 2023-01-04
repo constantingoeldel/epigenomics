@@ -59,7 +59,6 @@ impl MethylationSite {
         }
 
         let gene = &strand[first_matching_gene_index];
-        println!("Result: {:?} {:?}", first_matching_gene_index, gene);
         if self.is_in_gene(gene, cutoff) {
             return Some(gene);
         }
@@ -115,12 +114,12 @@ impl MethylationSite {
             position *= 100.0; // Normalize to 0-100%
         }
 
-        for (i, windows) in local_windows.iter_mut().enumerate() {
+        for (i, window) in local_windows.iter_mut().enumerate() {
             let lower_bound = i as f32 * step - E;
             let upper_bound = lower_bound + size + E;
 
             if position >= lower_bound && position <= upper_bound {
-                windows.push(self.clone());
+                window.push(self.clone());
                 windows_in.push((region.clone(), i));
             }
         }
