@@ -82,8 +82,7 @@ impl MethylationSite {
         let end = gene.end as f32;
         let length = end - start;
 
-        //
-        // // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
+        // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
         let offset = match &self.strand {
             Strand::Sense => location - start,
             Strand::Antisense => end - location,

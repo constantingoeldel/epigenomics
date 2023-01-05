@@ -63,14 +63,22 @@ fn main() -> Result<()> {
         chromosome_count.into()
     ];
     // Put genes into their correct bucket
+    let mut gene_length_sum = 0;
     genes.iter().for_each(|g| {
         let chromosome = &mut structured_genes[(g.chromosome - 1) as usize];
         let strand = match &g.strand {
             Strand::Sense => &mut chromosome.sense,
             Strand::Antisense => &mut chromosome.antisense,
         };
+        gene_length_sum += g.end - g.start;
         strand.push(g.to_owned());
     });
+    let average_gene_length = gene_length_sum / genes.len() as i32;
+    println!(
+        "Average gene length: {} bp, {} genes",
+        average_gene_length,
+        genes.len()
+    );
 
     // Determine the maximum gene length by iterating over all genes
     let mut max_gene_length: i32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
