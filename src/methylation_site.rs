@@ -13,6 +13,11 @@ pub struct MethylationSite {
 }
 
 impl MethylationSite {
+    /// Create a new CG site from a line of a methylation file.
+    /// Only yields a CG site if the line is formatted correctly and is a CG site.
+    /// If invalid, an error is returned.
+    ///
+    /// One pitfall of this implementation is the `collect tuple` call, which only yields a `Some` value if the line has exactly 9 tab-separated fields.
     pub fn from_methylome_file_line(s: &str) -> Result<Self> {
         s.split('\t')
             .collect_tuple()
@@ -31,6 +36,10 @@ impl MethylationSite {
             })
             .ok_or(Error::CGSite)?
     }
+    /// Checks weather a given CG site belongs to a specific gene. The cutoff is the number of bases upstream and downstream of the gene to consider the CG site in the gene. For example, a cutoff of 1000 would consider a CG site 1000 bases upstream of the gene to be in the gene.
+    /// To strictly check weather a CG site is within the gene region, pass a cutoff of 0.
+    ///
+    /// Passing a negative cutoff is possible but leads to undefined behaviour if used together with ``find_gene``.
     pub fn is_in_gene(&self, gene: &Gene, cutoff: i32) -> bool {
         self.chromosome == gene.chromosome
             && gene.start <= self.location + cutoff
@@ -38,10 +47,12 @@ impl MethylationSite {
             && self.strand == gene.strand
     }
 
+    /// Find the gene within a genome that a CG site belongs to. Due to binary search, searching is O(log n) where n is the number of genes in the genome.
+    /// Therefore, this method is efficient to use on large genomes.
+    ///
+    /// The lifetime of the genome is longer than the lifetime of the CG site.
+    /// GG sites exist only while a single methylation file is being processed but the genome is loaded once and exists for the entire program
     pub fn find_gene<'short, 'long>(
-        // The lifetime of the genome is longer than the lifetime of the cg site
-        // cg sites exist only while a single methylation file is being processed
-        // the genome is loaded once and exists for the entire program
         &'short self,
         genome: &'long [GenesByStrand],
         cutoff: i32,
@@ -65,7 +76,10 @@ impl MethylationSite {
 
         None
     }
-
+    /// Place a CG site in the correct windows. Returns a list of all the successfull insertions as a tuple of the region (upstream, downstream or gene) and the index of the window.
+    ///
+    /// It works by first finding the region the CG site is in (upstream, downstream or gene) and then finding the windows within that a CG site belongs to.
+    ///
     pub fn place_in_windows(
         &self,
         gene: &Gene,
