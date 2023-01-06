@@ -62,10 +62,11 @@ Strandness: If supplied, will ignore the strand of the gene when determining whe
 
 From `/mnt/extStorage/constantin/extractor` run 
 
-`extractor -m ../methylome/within_gbM_genes -a ../gbM_gene_anotation_extract_Arabidopsis.bed -w 5 -o ../windows `
+```
+extractor -m ../methylome/within_gbM_genes -a ../gbM_gene_anotation_extract_Arabidopsis.bed -w 5 -o ../windows 
 
 extractor -m ../methylome/within_gbM_genes/ -g ../methylome/gbM_gene_anotation_extract_Arabidopsis.bed -o ../windows_relative_no_overlap  -w 5 -s 0 
-
+```
 # Development
 
 For live-reloading changes use cargo watch 

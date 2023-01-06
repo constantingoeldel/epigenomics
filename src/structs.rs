@@ -56,7 +56,7 @@ impl GenesByStrand {
 }
 
 impl Gene {
-    pub fn from_annotation_file_line(s: &str) -> Option<Self> {
+    pub fn from_annotation_file_line(s: &str, invert_strand: bool) -> Option<Self> {
         s.split('\t')
             .collect_tuple()
             .map(|(chromosome, start, end, name, _, strand)| Gene {
@@ -64,7 +64,8 @@ impl Gene {
                 start: start.parse::<i32>().unwrap(),
                 end: end.parse::<i32>().unwrap(),
                 name: String::from(name),
-                strand: if strand == "+" {
+                strand: if (strand == "+") ^ invert_strand {
+                    // XOR: if the strand is + and we don't want to invert it, or if the strand is - and we do want to invert it -> Sense
                     Strand::Sense
                 } else {
                     Strand::Antisense

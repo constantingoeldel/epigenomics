@@ -3,7 +3,7 @@ use crate::*;
 pub fn open_file(path: &PathBuf, filename: &OsString) -> Result<File> {
     let file = File::open(path).map_err(|_| {
         Error::File(
-            String::from("methylome file"),
+            String::from("Could not find methylome file with name "),
             String::from(filename.to_str().unwrap()),
         )
     })?;
@@ -11,14 +11,22 @@ pub fn open_file(path: &PathBuf, filename: &OsString) -> Result<File> {
 }
 
 pub fn lines_from_file(filename: &str) -> Result<io::Lines<io::BufReader<File>>> {
-    let file = File::open(filename)
-        .map_err(|_| Error::File(String::from("Annotation file"), String::from(filename)))?;
+    let file = File::open(filename).map_err(|_| {
+        Error::File(
+            String::from("Could not find Annotation file on path "),
+            String::from(filename),
+        )
+    })?;
     Ok(io::BufReader::new(file).lines())
 }
 
 pub fn load_methylome(methylome: &str) -> Result<Vec<(PathBuf, OsString)>> {
-    let methylome_dir = fs::read_dir(methylome)
-        .map_err(|_| Error::File(String::from("Methylome directory"), String::from(methylome)))?;
+    let methylome_dir = fs::read_dir(methylome).map_err(|_| {
+        Error::File(
+            String::from("Could not find Methylome directory on path "),
+            String::from(methylome),
+        )
+    })?;
     let methylome_files = methylome_dir
         .map(|f| (f.as_ref().unwrap().path(), f.unwrap().file_name()))
         .collect();

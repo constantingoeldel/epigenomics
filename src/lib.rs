@@ -1,5 +1,4 @@
 use crate::{arguments::Args, error::Error};
-use clap::Parser;
 
 use files::*;
 use methylation_site::*;
@@ -14,7 +13,7 @@ use std::{
 use structs::*;
 use windows::*;
 
-mod arguments;
+pub mod arguments;
 mod error;
 mod files;
 mod methylation_site;
@@ -22,9 +21,9 @@ mod setup;
 mod structs;
 mod windows;
 
-fn main() -> Result<()> {
+pub fn extract(args: Args) -> Result<()> {
     let start = std::time::Instant::now();
-    let mut args = Args::parse();
+    let mut args = args;
 
     // Adj ust window_step to default value
     if args.window_step == 0 {
@@ -39,7 +38,7 @@ fn main() -> Result<()> {
     // Parse annotation file to extract genes
     for line in annotation_lines {
         let line = line?;
-        let gene = Gene::from_annotation_file_line(&line);
+        let gene = Gene::from_annotation_file_line(&line, args.invert);
         if let Some(gene) = gene {
             genes.push(gene)
         }
@@ -64,20 +63,26 @@ fn main() -> Result<()> {
     ];
     // Put genes into their correct bucket
     let mut gene_length_sum = 0;
+    let mut sense_gene_count = 0;
     genes.iter().for_each(|g| {
         let chromosome = &mut structured_genes[(g.chromosome - 1) as usize];
         let strand = match &g.strand {
             Strand::Sense => &mut chromosome.sense,
             Strand::Antisense => &mut chromosome.antisense,
         };
+        if g.strand == Strand::Sense {
+            sense_gene_count += 1;
+        }
         gene_length_sum += g.end - g.start;
         strand.push(g.to_owned());
     });
     let average_gene_length = gene_length_sum / genes.len() as i32;
     println!(
-        "Average gene length: {} bp, {} genes",
+        "Average gene length: {} bp, {} genes, of which {} are on the sense strand and {} on the antisense strand",
         average_gene_length,
-        genes.len()
+        genes.len(),
+        sense_gene_count,
+        genes.len() - sense_gene_count
     );
 
     // Determine the maximum gene length by iterating over all genes
@@ -98,16 +103,23 @@ fn main() -> Result<()> {
         structured_genes,
         |genome, (path, filename)| -> Result<()> {
             let file = open_file(path, filename)?;
-            let windows =
+            let mut windows =
                 extract_windows(file, genome.to_vec(), max_gene_length as i32, args.clone())?;
-            windows.save(&args.output_dir, filename, args.window_step as usize)?;
+            if args.invert {
+                windows = windows.inverse();
+            }
+            windows.save(
+                &args.output_dir,
+                filename,
+                args.window_step as usize,
+                args.invert,
+            )?;
             let distribution = windows.distribution();
             let path = format!(
                 "{}/{}_distribution.txt",
                 &args.output_dir,
                 filename.to_str().unwrap()
             );
-            println!("Saving distribution to {}", path);
             fs::write(path, distribution)?;
             Ok(())
         },

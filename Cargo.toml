@@ -1,7 +1,17 @@
 [package]
 name = "extractor"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
+
+[lib]
+name = "extractor"
+path = "src/lib.rs"
+
+[[bin]]
+name = "extractor"
+path = "src/cli.rs"
+
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,3 +20,6 @@ clap = { version = "4.0.27", features = ["derive"] }
 itertools = "0.10.5"
 thiserror = "1.0.37"
 rayon = "1.5"
+
+[dev-dependencies]
+serial_test = "*"

@@ -48,6 +48,13 @@ impl Windows {
             Region::Downstream => &mut self.downstream,
         }
     }
+    pub fn inverse(mut self) -> Self {
+        self.upstream = self.downstream.iter().rev().map(|a| a.to_owned()).collect();
+        self.gene = self.gene.iter().rev().map(|a| a.to_owned()).collect();
+        self.downstream = self.upstream.iter().rev().map(|a| a.to_owned()).collect();
+        self
+    }
+
     pub fn distribution(&self) -> String {
         // In CSV format
         let mut output = String::new();
@@ -77,7 +84,13 @@ impl Windows {
         output
     }
 
-    pub fn save(&self, output_dir: &str, filename: &OsString, step: usize) -> Result<()> {
+    pub fn save(
+        &self,
+        output_dir: &str,
+        filename: &OsString,
+        step: usize,
+        invert_direction: bool,
+    ) -> Result<()> {
         for windows in vec![
             (&self.upstream, "upstream"),
             (&self.gene, "gene"),
@@ -93,7 +106,6 @@ impl Windows {
                     window * step,
                     filename.to_str().unwrap()
                 );
-                println!("Saving to {}", output_file);
                 let mut file = OpenOptions::new()
                     .append(true)
                     .create(true)
@@ -130,7 +142,7 @@ pub fn extract_windows(
             }
 
             // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
-            let Ok(cg) = MethylationSite::from_methylome_file_line(&line) else {continue;};
+            let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
 
             if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
                 last_gene = cg.find_gene(&genome, args.cutoff);
@@ -151,5 +163,49 @@ impl Display for Windows {
             "Upstream: {:?}\n\nGene: {:?}\n\nDownstream: {:?}\n\n",
             self.upstream, self.gene, self.downstream
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::arguments::Args;
+
+    #[test]
+    fn new_absolute() {
+        let args = Args {
+            invert: false,
+            methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
+            genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
+                .to_string(),
+            window_size: 512,
+            window_step: 256,
+
+            output_dir: "/home/constantin/windows".to_string(),
+            absolute: true,
+            cutoff: 2048,
+        };
+        let windows = super::Windows::new(4096, &args);
+        assert_eq!(windows.upstream.len(), 8);
+        assert_eq!(windows.gene.len(), 16);
+        assert_eq!(windows.downstream.len(), 8);
+    }
+    #[test]
+    fn new_relative() {
+        let args = Args {
+            invert: false,
+            methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
+            genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
+                .to_string(),
+            window_size: 5,
+            window_step: 1,
+
+            output_dir: "/home/constantin/windows".to_string(),
+            absolute: false,
+            cutoff: 2048,
+        };
+        let windows = super::Windows::new(4096, &args);
+        assert_eq!(windows.upstream.len(), 100);
+        assert_eq!(windows.gene.len(), 100);
+        assert_eq!(windows.downstream.len(), 100);
     }
 }

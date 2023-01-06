@@ -31,4 +31,8 @@ pub struct Args {
     /// Number of basepairs to include upstream and downstream of gene
     #[arg(short, long, default_value_t = 2048)]
     pub cutoff: i32,
+
+    /// Invert strands, to switch from 5' to 3' and vice versa
+    #[arg(short, long, default_value_t = false)]
+    pub invert: bool,
 }
