@@ -1,5 +1,5 @@
 use clap::Parser;
-use extractor::{arguments::Args, extract};
+use lib::{arguments::Args, *};
 
 fn main() {
     let args = Args::parse();

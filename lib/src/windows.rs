@@ -9,7 +9,7 @@ use itertools::Itertools;
 use crate::*;
 
 pub type Window = Vec<MethylationSite>;
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Windows {
     pub upstream: Vec<Window>,
     pub gene: Vec<Window>,
@@ -60,15 +60,15 @@ impl Windows {
         let mut output = String::new();
         output += "Upstream\n";
         for (i, window) in self.upstream.iter().enumerate() {
-            output.push_str(&format!("{},{}\n", i, window.len()));
+            output.push_str(&format!("{};{}\n", i, window.len()));
         }
         output += "Gene\n";
         for (i, window) in self.gene.iter().enumerate() {
-            output.push_str(&format!("{},{}\n", i, window.len()));
+            output.push_str(&format!("{};{}\n", i, window.len()));
         }
         output += "Downstream\n";
         for (i, window) in self.downstream.iter().enumerate() {
-            output.push_str(&format!("{},{}\n", i, window.len()));
+            output.push_str(&format!("{};{}\n", i, window.len()));
         }
         output += "Combined\n";
         for (i, window) in self
@@ -78,19 +78,13 @@ impl Windows {
             .chain(self.downstream.iter())
             .enumerate()
         {
-            output.push_str(&format!("{},{}\n", i, window.len()));
+            output.push_str(&format!("{};{}\n", i, window.len()));
         }
 
         output
     }
 
-    pub fn save(
-        &self,
-        output_dir: &str,
-        filename: &OsString,
-        step: usize,
-        invert_direction: bool,
-    ) -> Result<()> {
+    pub fn save(&self, args: &Args, filename: &OsString) -> Result<()> {
         for windows in vec![
             (&self.upstream, "upstream"),
             (&self.gene, "gene"),
@@ -101,9 +95,9 @@ impl Windows {
             for (window, cg_sites) in windows.0.iter().enumerate() {
                 let output_file = format!(
                     "{}/{}/{}/{}",
-                    output_dir,
+                    args.output_dir,
                     windows.1,
-                    window * step,
+                    window * args.window_step as usize,
                     filename.to_str().unwrap()
                 );
                 let mut file = OpenOptions::new()
@@ -143,7 +137,6 @@ pub fn extract_windows(
 
             // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
             let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
-
             if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
                 last_gene = cg.find_gene(&genome, args.cutoff);
             }
@@ -173,6 +166,7 @@ mod test {
     #[test]
     fn new_absolute() {
         let args = Args {
+            db: false,
             invert: false,
             methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
             genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
@@ -192,6 +186,8 @@ mod test {
     #[test]
     fn new_relative() {
         let args = Args {
+            db: false,
+
             invert: false,
             methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
             genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"

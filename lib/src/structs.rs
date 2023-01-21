@@ -6,10 +6,15 @@ use crate::error;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, sqlx::Type)]
+#[sqlx(type_name = "strandness")]
 pub enum Strand {
+    #[sqlx(rename = "+")]
     Sense,
+    #[sqlx(rename = "-")]
     Antisense,
+    #[sqlx(rename = "*")]
+    Unknown,
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +30,7 @@ pub struct Gene {
     pub start: i32,
     pub end: i32,
     pub name: String,
+    pub annotation: String,
     pub strand: Strand,
 }
 
@@ -46,6 +52,7 @@ impl GenesByStrand {
         match gene.strand {
             Strand::Sense => self.sense.push(gene),
             Strand::Antisense => self.antisense.push(gene),
+            _ => (),
         }
     }
 
@@ -59,11 +66,12 @@ impl Gene {
     pub fn from_annotation_file_line(s: &str, invert_strand: bool) -> Option<Self> {
         s.split('\t')
             .collect_tuple()
-            .map(|(chromosome, start, end, name, _, strand)| Gene {
+            .map(|(chromosome, start, end, name, annotation, strand)| Gene {
                 chromosome: chromosome.parse::<u8>().unwrap(),
                 start: start.parse::<i32>().unwrap(),
                 end: end.parse::<i32>().unwrap(),
                 name: String::from(name),
+                annotation: String::from(annotation),
                 strand: if (strand == "+") ^ invert_strand {
                     // XOR: if the strand is + and we don't want to invert it, or if the strand is - and we do want to invert it -> Sense
                     Strand::Sense
@@ -89,6 +97,7 @@ impl Display for Strand {
         match self {
             Strand::Sense => write!(f, "+"),
             Strand::Antisense => write!(f, "-"),
+            Strand::Unknown => write!(f, "*"),
         }
     }
 }

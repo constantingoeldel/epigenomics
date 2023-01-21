@@ -35,4 +35,8 @@ pub struct Args {
     /// Invert strands, to switch from 5' to 3' and vice versa
     #[arg(short, long, default_value_t = false)]
     pub invert: bool,
+
+    /// Use a Postgres database to do everything
+    #[arg(long, default_value_t = true)]
+    pub db: bool,
 }

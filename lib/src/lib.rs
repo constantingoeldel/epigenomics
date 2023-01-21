@@ -14,12 +14,12 @@ use structs::*;
 use windows::*;
 
 pub mod arguments;
-mod error;
-mod files;
-mod methylation_site;
-mod setup;
-mod structs;
-mod windows;
+pub mod error;
+pub mod files;
+pub mod methylation_site;
+pub mod setup;
+pub mod structs;
+pub mod windows;
 
 pub fn extract(args: Args) -> Result<()> {
     let start = std::time::Instant::now();
@@ -69,6 +69,7 @@ pub fn extract(args: Args) -> Result<()> {
         let strand = match &g.strand {
             Strand::Sense => &mut chromosome.sense,
             Strand::Antisense => &mut chromosome.antisense,
+            _ => return,
         };
         if g.strand == Strand::Sense {
             sense_gene_count += 1;
@@ -108,12 +109,7 @@ pub fn extract(args: Args) -> Result<()> {
             if args.invert {
                 windows = windows.inverse();
             }
-            windows.save(
-                &args.output_dir,
-                filename,
-                args.window_step as usize,
-                args.invert,
-            )?;
+            windows.save(&args, filename)?;
             let distribution = windows.distribution();
             let path = format!(
                 "{}/{}_distribution.txt",

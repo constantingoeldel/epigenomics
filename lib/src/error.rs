@@ -1,8 +1,5 @@
 use std::io;
-
-use thiserror::Error;
-
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Argument error")]
     Argument(#[from] clap::Error),
@@ -18,4 +15,13 @@ pub enum Error {
 
     #[error("Unable to convert: Are you passing a valid number? {0}")]
     NumberConversion(#[from] std::num::ParseIntError),
+
+    #[error("Unable to convert: Are you passing a valid number? {0}")]
+    FloatConversion(#[from] std::num::ParseFloatError),
+
+    #[error("Error when querying the database: {0}")]
+    DB(#[from] sqlx::Error),
+
+    #[error("Error: {0}")]
+    Simple(&'static str),
 }

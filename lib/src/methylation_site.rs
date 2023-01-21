@@ -4,37 +4,121 @@ use itertools::Itertools;
 
 use crate::*;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct MethylationSite {
     pub chromosome: u8,
     pub location: i32,
     pub strand: Strand,
     pub original: String,
+    pub context: String,
+    pub count_methylated: u32,
+    pub count_total: u32,
+    pub posteriormax: f32,
+    pub status: char,
+    pub meth_lvl: f32,
 }
 
 impl MethylationSite {
+    const fn new(location: i32, strand: Strand) -> Self {
+        MethylationSite {
+            chromosome: 0,
+            location,
+            strand,
+            original: String::new(),
+            context: String::new(),
+            count_methylated: 20,
+            count_total: 30,
+            posteriormax: 0.999,
+            status: 'M',
+            meth_lvl: 0.222,
+        }
+    }
     /// Create a new CG site from a line of a methylation file.
     /// Only yields a CG site if the line is formatted correctly and is a CG site.
     /// If invalid, an error is returned.
     ///
-    /// One pitfall of this implementation is the `collect tuple` call, which only yields a `Some` value if the line has exactly 9 tab-separated fields.
+    /// One pitfall of this implementation is the `collect tuple` call, which only yields a `Some` value if the line has exactly 9 or 10 tab-separated fields.
+    /// Some files provide the trinucleotide, others don't, so there are two versions.
     pub fn from_methylome_file_line(s: &str, invert_strand: bool) -> Result<Self> {
-        s.split('\t')
+        let first_format = s
+            .split('\t')
             .collect_tuple()
             .filter(|(_, _, _, context, _, _, _, _, _)| context == &"CG")
-            .map(|(chromosome, location, strand, _, _, _, _, _, _)| {
-                Ok(MethylationSite {
-                    chromosome: chromosome.parse::<u8>()?,
-                    location: location.parse::<i32>()?,
-                    strand: if (strand == "+") ^ invert_strand {
-                        Strand::Sense
-                    } else {
-                        Strand::Antisense
+            .map(
+                |(
+                    chromosome,
+                    location,
+                    strand,
+                    context,
+                    count_methylated,
+                    count_total,
+                    posteriormax,
+                    status,
+                    meth_lvl,
+                )| {
+                    Ok(MethylationSite {
+                        chromosome: chromosome.parse::<u8>()?,
+                        location: location.parse::<i32>()?,
+                        strand: if (strand == "+") ^ invert_strand {
+                            Strand::Sense
+                        } else {
+                            Strand::Antisense
+                        },
+                        original: s.to_owned(),
+                        context: String::from(context),
+                        count_methylated: count_methylated.parse::<u32>()?,
+                        count_total: count_total.parse::<u32>()?,
+                        posteriormax: posteriormax.parse::<f32>()?,
+                        status: status
+                            .chars()
+                            .nth(0)
+                            .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                        meth_lvl: meth_lvl.parse::<f32>()?,
+                    })
+                },
+            );
+        if first_format.is_some() {
+            return first_format.unwrap();
+        } else {
+            s.split('\t')
+                .collect_tuple()
+                .filter(|(_, _, _, context, _, _, _, _, _, _)| context == &"CG")
+                .map(
+                    |(
+                        chromosome,
+                        location,
+                        strand,
+                        context,
+                        count_methylated,
+                        count_total,
+                        posteriormax,
+                        status,
+                        meth_lvl,
+                        _,
+                    )| {
+                        Ok(MethylationSite {
+                            chromosome: chromosome.parse::<u8>()?,
+                            location: location.parse::<i32>()?,
+                            strand: if (strand == "+") ^ invert_strand {
+                                Strand::Sense
+                            } else {
+                                Strand::Antisense
+                            },
+                            original: s.to_owned(),
+                            context: String::from(context),
+                            count_methylated: count_methylated.parse::<u32>()?,
+                            count_total: count_total.parse::<u32>()?,
+                            posteriormax: posteriormax.parse::<f32>()?,
+                            status: status
+                                .chars()
+                                .nth(0)
+                                .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                            meth_lvl: meth_lvl.parse::<f32>()?,
+                        })
                     },
-                    original: s.to_owned(),
-                })
-            })
-            .ok_or(Error::CGSite)?
+                )
+                .ok_or(Error::CGSite)?
+        }
     }
     /// Checks weather a given CG site belongs to a specific gene. The cutoff is the number of bases upstream and downstream of the gene to consider the CG site in the gene. For example, a cutoff of 1000 would consider a CG site 1000 bases upstream of the gene to be in the gene.
     /// To strictly check weather a CG site is within the gene region, pass a cutoff of 0.
@@ -61,6 +145,7 @@ impl MethylationSite {
         let strand = match self.strand {
             Strand::Sense => &chromosome.sense,
             Strand::Antisense => &chromosome.antisense,
+            _ => return None, // TODO: Handle unknown strand case
         };
         let first_matching_gene_index = strand
             .binary_search_by_key(&self.location, |gene| gene.end + cutoff)
@@ -97,11 +182,12 @@ impl MethylationSite {
         let length = end - start;
 
         // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
+        let mut windows_in = Vec::new();
         let offset = match &self.strand {
             Strand::Sense => location - start,
             Strand::Antisense => end - location,
+            _ => return windows_in, // TODO better handling
         };
-        let mut windows_in = Vec::new();
         let region = match offset {
             x if x < 0.0 => Region::Upstream,
             x if x > length => Region::Downstream, // CG site exactly on the end of the gene is still considered in the gene
@@ -118,6 +204,7 @@ impl MethylationSite {
             (Region::Upstream, Strand::Antisense) => end - location + cutoff,
             (Region::Gene, Strand::Antisense) => end - location,
             (Region::Downstream, Strand::Antisense) => start - location,
+            _ => return windows_in,
         };
 
         if !args.absolute {
@@ -159,71 +246,33 @@ mod tests {
     use crate::*;
 
     const GENE: Gene = Gene {
+        annotation: String::new(),
         chromosome: 1,
         start: 50,
         end: 100,
         strand: Strand::Sense,
         name: String::new(),
     };
-    const WITHIN_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 80,
-        strand: Strand::Sense,
-        original: String::new(),
-    };
+    const WITHIN_CG: MethylationSite = MethylationSite::new(80, Strand::Sense);
 
-    const OPPOSITE_STRAND_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 80,
-        strand: Strand::Antisense,
-        original: String::new(),
-    };
+    const OPPOSITE_STRAND_CG: MethylationSite = MethylationSite::new(80, Strand::Antisense);
 
-    const HIGHER_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 150,
-        strand: Strand::Sense,
-        original: String::new(),
-    };
-    const LOWER_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 0,
-        strand: Strand::Sense,
-        original: String::new(),
-    };
+    const HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Sense);
+    const LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Sense);
     const ANTI_GENE: Gene = Gene {
+        annotation: String::new(),
         chromosome: 1,
         start: 50,
         end: 100,
         strand: Strand::Antisense,
         name: String::new(),
     };
-    const ANTI_WITHIN_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 80,
-        strand: Strand::Antisense,
-        original: String::new(),
-    };
+    const ANTI_WITHIN_CG: MethylationSite = MethylationSite::new(80, Strand::Antisense);
 
-    const ANTI_OPPOSITE_STRAND_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 80,
-        strand: Strand::Sense,
-        original: String::new(),
-    };
+    const ANTI_OPPOSITE_STRAND_CG: MethylationSite = MethylationSite::new(80, Strand::Sense);
 
-    const ANTI_HIGHER_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 150,
-        strand: Strand::Antisense,
-        original: String::new(),
-    };
-    const ANTI_LOWER_CG: MethylationSite = MethylationSite {
-        chromosome: 1,
-        location: 0,
-        strand: Strand::Antisense,
-        original: String::new(),
-    };
+    const ANTI_HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Antisense);
+    const ANTI_LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Antisense);
 
     #[test]
     fn test_instantiate_from_methylome_file_line() {
@@ -260,6 +309,7 @@ mod tests {
         let mut genes = GenesByStrand::new();
         for i in 0..100 {
             genes.insert(Gene {
+                annotation: String::new(),
                 chromosome: 1,
                 start: i,
                 end: i + 50,
@@ -290,6 +340,7 @@ mod tests {
     #[test]
     fn test_place_site_absolute() {
         let args = Args {
+            db: false,
             invert: false,
             absolute: true,
             cutoff: 1000,
@@ -300,6 +351,8 @@ mod tests {
             window_step: 1,
         };
         let all_within_gene = Gene {
+            annotation: String::new(),
+
             chromosome: 1,
             start: 1000,
             end: 2000,
@@ -307,6 +360,7 @@ mod tests {
             name: String::new(),
         };
         let all_upstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 2000,
             end: 3000,
@@ -314,6 +368,7 @@ mod tests {
             name: String::new(),
         };
         let all_downstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 0,
             end: 1000,
@@ -323,12 +378,7 @@ mod tests {
 
         let mut windows = Windows::new(1000, &args);
         for i in 1..1000 {
-            let cg = MethylationSite {
-                chromosome: 1,
-                location: i + 1000,
-                strand: Strand::Sense,
-                original: String::new(),
-            };
+            let cg = MethylationSite::new(i + 1000, Strand::Antisense);
             let upstream = cg.place_in_windows(&all_upstream_gene, &mut windows, &args);
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
@@ -354,6 +404,8 @@ mod tests {
     #[test]
     fn test_place_site_relative_acting_like_absolute() {
         let args = Args {
+            db: false,
+
             invert: false,
             absolute: false,
             cutoff: 100,
@@ -364,6 +416,7 @@ mod tests {
             window_step: 1,
         };
         let all_within_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 100,
             end: 200,
@@ -371,6 +424,7 @@ mod tests {
             name: String::new(),
         };
         let all_upstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 200,
             end: 300,
@@ -378,6 +432,7 @@ mod tests {
             name: String::new(),
         };
         let all_downstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 0,
             end: 100,
@@ -387,12 +442,7 @@ mod tests {
 
         let mut windows = Windows::new(100, &args);
         for i in 1..100 {
-            let cg = MethylationSite {
-                chromosome: 1,
-                location: i + 100,
-                strand: Strand::Sense,
-                original: String::new(),
-            };
+            let cg = MethylationSite::new(i + 100, Strand::Sense);
             let upstream = cg.place_in_windows(&all_upstream_gene, &mut windows, &args);
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
@@ -409,6 +459,8 @@ mod tests {
     #[test]
     fn test_place_site_relative() {
         let args = Args {
+            db: false,
+
             invert: false,
             absolute: false,
             cutoff: 1000,
@@ -419,6 +471,7 @@ mod tests {
             window_step: 1,
         };
         let all_within_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 1000,
             end: 2000,
@@ -426,6 +479,7 @@ mod tests {
             name: String::new(),
         };
         let all_upstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 2000,
             end: 3000,
@@ -433,6 +487,7 @@ mod tests {
             name: String::new(),
         };
         let all_downstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 0,
             end: 1000,
@@ -443,12 +498,7 @@ mod tests {
         let mut windows = Windows::new(1000, &args);
         assert!(windows.upstream.len() == 100);
         for i in 1..1000 {
-            let cg = MethylationSite {
-                chromosome: 1,
-                location: i + 1000,
-                strand: Strand::Sense,
-                original: String::new(),
-            };
+            let cg = MethylationSite::new(i + 1000, Strand::Sense);
             let upstream = cg.place_in_windows(&all_upstream_gene, &mut windows, &args);
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
@@ -466,56 +516,17 @@ mod tests {
 
     #[test]
     fn test_place_site() {
-        let cg_a = MethylationSite {
-            chromosome: 1,
-            location: 80,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_b = MethylationSite {
-            chromosome: 1,
-            location: 100,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_c = MethylationSite {
-            chromosome: 1,
-            location: 123,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_d = MethylationSite {
-            chromosome: 1,
-            location: 200,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_e = MethylationSite {
-            chromosome: 1,
-            location: 201,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_f = MethylationSite {
-            chromosome: 1,
-            location: 512 + 100 + 100,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_g = MethylationSite {
-            chromosome: 1,
-            location: 1024 + 100 + 100,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_h = MethylationSite {
-            chromosome: 1,
-            location: 2048 + 100 + 100,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
+        let cg_a = MethylationSite::new(80, Strand::Sense);
+        let cg_b = MethylationSite::new(100, Strand::Sense);
+        let cg_c = MethylationSite::new(123, Strand::Sense);
+        let cg_d = MethylationSite::new(200, Strand::Sense);
+        let cg_e = MethylationSite::new(201, Strand::Sense);
+        let cg_f = MethylationSite::new(512 + 100 + 100, Strand::Sense);
+        let cg_g = MethylationSite::new(1024 + 100 + 100, Strand::Sense);
+        let cg_h = MethylationSite::new(2048 + 100 + 100, Strand::Sense);
 
         let gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 100,
             end: 200,
@@ -524,6 +535,8 @@ mod tests {
         };
 
         let args = Args {
+            db: false,
+
             invert: false,
             absolute: false,
             cutoff: 2048,
@@ -559,44 +572,15 @@ mod tests {
     }
     #[test]
     fn test_place_site_absolute_2() {
-        let cg_a = MethylationSite {
-            chromosome: 1,
-            location: 80,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_b = MethylationSite {
-            chromosome: 1,
-            location: 100,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_c = MethylationSite {
-            chromosome: 1,
-            location: 123,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_d = MethylationSite {
-            chromosome: 1,
-            location: 200,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_e = MethylationSite {
-            chromosome: 1,
-            location: 201,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
-        let cg_f = MethylationSite {
-            chromosome: 1,
-            location: 220,
-            strand: Strand::Sense,
-            original: String::new(),
-        };
+        let cg_a = MethylationSite::new(80, Strand::Sense);
+        let cg_b = MethylationSite::new(100, Strand::Sense);
+        let cg_c = MethylationSite::new(123, Strand::Sense);
+        let cg_d = MethylationSite::new(200, Strand::Sense);
+        let cg_e = MethylationSite::new(201, Strand::Sense);
+        let cg_f = MethylationSite::new(220, Strand::Sense);
 
         let gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 100,
             end: 200,
@@ -605,6 +589,8 @@ mod tests {
         };
 
         let args = Args {
+            db: false,
+
             invert: false,
             absolute: true,
             cutoff: 2048,
@@ -640,6 +626,8 @@ mod tests {
     #[test]
     fn test_place_site_relative_antisense() {
         let args = Args {
+            db: false,
+
             invert: false,
             absolute: false,
             cutoff: 1000,
@@ -650,6 +638,7 @@ mod tests {
             window_step: 1,
         };
         let all_within_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 1000,
             end: 2000,
@@ -657,6 +646,7 @@ mod tests {
             name: String::new(),
         };
         let all_upstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 2000,
             end: 3000,
@@ -664,6 +654,7 @@ mod tests {
             name: String::new(),
         };
         let all_downstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 0,
             end: 1000,
@@ -674,12 +665,7 @@ mod tests {
         let mut windows = Windows::new(1000, &args);
         assert!(windows.upstream.len() == 100);
         for i in 1..1000 {
-            let cg = MethylationSite {
-                chromosome: 1,
-                location: i + 1000,
-                strand: Strand::Antisense,
-                original: String::new(),
-            };
+            let cg = MethylationSite::new(i + 1000, Strand::Antisense);
             let upstream = cg.place_in_windows(&all_upstream_gene, &mut windows, &args);
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
@@ -701,6 +687,7 @@ mod tests {
     #[test]
     fn test_place_site_absolute_invert() {
         let args = Args {
+            db: false,
             invert: true,
             absolute: true,
             cutoff: 1000,
@@ -711,6 +698,7 @@ mod tests {
             window_step: 1,
         };
         let all_within_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 1000,
             end: 2000,
@@ -718,6 +706,7 @@ mod tests {
             name: String::new(),
         };
         let all_upstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 2000,
             end: 3000,
@@ -725,6 +714,7 @@ mod tests {
             name: String::new(),
         };
         let all_downstream_gene = Gene {
+            annotation: String::new(),
             chromosome: 1,
             start: 0,
             end: 1000,
@@ -735,12 +725,7 @@ mod tests {
         let mut windows = Windows::new(1000, &args);
         assert!(windows.upstream.len() == 1000);
         for i in 1..1000 {
-            let cg = MethylationSite {
-                chromosome: 1,
-                location: i + 1000,
-                strand: Strand::Sense,
-                original: String::new(),
-            };
+            let cg = MethylationSite::new(i + 1000, Strand::Sense);
             let upstream = cg.place_in_windows(&all_upstream_gene, &mut windows, &args);
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
