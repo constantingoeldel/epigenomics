@@ -16,6 +16,7 @@ pub struct MethylationSite {
     pub posteriormax: f32,
     pub status: char,
     pub meth_lvl: f32,
+    pub context_trinucleotide: String,
 }
 
 impl MethylationSite {
@@ -31,6 +32,7 @@ impl MethylationSite {
             posteriormax: 0.999,
             status: 'M',
             meth_lvl: 0.222,
+            context_trinucleotide: String::new(),
         }
     }
     /// Create a new CG site from a line of a methylation file.
@@ -74,52 +76,103 @@ impl MethylationSite {
                             .nth(0)
                             .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
                         meth_lvl: meth_lvl.parse::<f32>()?,
+                        context_trinucleotide: String::from("XXX"),
                     })
                 },
             );
         if first_format.is_some() {
             return first_format.unwrap();
-        } else {
-            s.split('\t')
-                .collect_tuple()
-                .filter(|(_, _, _, context, _, _, _, _, _, _)| context == &"CG")
-                .map(
-                    |(
-                        chromosome,
-                        location,
-                        strand,
-                        context,
-                        count_methylated,
-                        count_total,
-                        posteriormax,
-                        status,
-                        meth_lvl,
-                        _,
-                    )| {
-                        Ok(MethylationSite {
-                            chromosome: chromosome.parse::<u8>()?,
-                            location: location.parse::<i32>()?,
-                            strand: if (strand == "+") ^ invert_strand {
-                                Strand::Sense
-                            } else {
-                                Strand::Antisense
-                            },
-                            original: s.to_owned(),
-                            context: String::from(context),
-                            count_methylated: count_methylated.parse::<u32>()?,
-                            count_total: count_total.parse::<u32>()?,
-                            posteriormax: posteriormax.parse::<f32>()?,
-                            status: status
-                                .chars()
-                                .nth(0)
-                                .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
-                            meth_lvl: meth_lvl.parse::<f32>()?,
-                        })
-                    },
-                )
-                .ok_or(Error::CGSite)?
         }
+        let second_format: Option<Result<MethylationSite>> = s
+            .split('\t')
+            .collect_tuple()
+            .filter(|(_, _, _, context, _, _, _, _, _, _)| context == &"CG")
+            .map(
+                |(
+                    chromosome,
+                    location,
+                    strand,
+                    context,
+                    count_methylated,
+                    count_total,
+                    posteriormax,
+                    status,
+                    meth_lvl,
+                    trinucleotide,
+                )| {
+                    Ok(MethylationSite {
+                        chromosome: chromosome.parse::<u8>()?,
+                        location: location.parse::<i32>()?,
+                        strand: if (strand == "+") ^ invert_strand {
+                            Strand::Sense
+                        } else {
+                            Strand::Antisense
+                        },
+                        original: s.to_owned(),
+                        context: String::from(context),
+                        count_methylated: count_methylated.parse::<u32>()?,
+                        count_total: count_total.parse::<u32>()?,
+                        posteriormax: posteriormax.parse::<f32>()?,
+                        status: status
+                            .chars()
+                            .nth(0)
+                            .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                        meth_lvl: meth_lvl.parse::<f32>()?,
+                        context_trinucleotide: String::from(trinucleotide),
+                    })
+                },
+            );
+
+        if second_format.is_some() {
+            return second_format.unwrap();
+        }
+        let third_format: Option<Result<MethylationSite>> = s
+            .split('\t')
+            .collect_tuple()
+            .filter(|(_, _, _, context, _, _, _, _, _, _, _)| context == &"CG")
+            .map(
+                |(
+                    chromosome,
+                    first_nucleotide,
+                    second_nucleotide,
+                    context,
+                    _, // No idea what that is
+                    strand,
+                    count_methylated,
+                    count_total,
+                    posteriormax,
+                    status,
+                    meth_lvl,
+                )| {
+                    Ok(MethylationSite {
+                        chromosome: chromosome.parse()?,
+                        location: if strand == "+" {
+                            first_nucleotide.parse::<i32>()?
+                        } else {
+                            second_nucleotide.parse::<i32>()?
+                        },
+                        strand: if (strand == "+") ^ invert_strand {
+                            Strand::Sense
+                        } else {
+                            Strand::Antisense
+                        },
+                        original: s.to_owned(),
+                        context: String::from(context),
+                        count_methylated: count_methylated.parse::<u32>()?,
+                        count_total: count_total.parse::<u32>()?,
+                        posteriormax: posteriormax.parse::<f32>()?,
+                        status: status
+                            .chars()
+                            .nth(0)
+                            .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                        meth_lvl: meth_lvl.parse::<f32>()?,
+                        context_trinucleotide: String::from("XXX"),
+                    })
+                },
+            );
+        third_format.ok_or(Error::CGSite)?
     }
+
     /// Checks weather a given CG site belongs to a specific gene. The cutoff is the number of bases upstream and downstream of the gene to consider the CG site in the gene. For example, a cutoff of 1000 would consider a CG site 1000 bases upstream of the gene to be in the gene.
     /// To strictly check weather a CG site is within the gene region, pass a cutoff of 0.
     ///

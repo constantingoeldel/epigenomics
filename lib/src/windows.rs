@@ -108,7 +108,7 @@ impl Windows {
                 let metadata = file.metadata();
                 if metadata.unwrap().len() == 0 {
                     // On first write to file, create header line
-                    file.write_all("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\n".as_bytes())?;
+                    file.write_all("seqnames\tstart\tstrand\tcontext\tcounts.methylated\tcounts.total\tposteriorMax\tstatus\trc.meth.lvl\tcontext.trinucleotide\n".as_bytes())?;
                 }
                 file.write_all(cg_sites.iter().map(|e| &e.original).join("\n").as_bytes())?;
             }
@@ -131,7 +131,7 @@ pub fn extract_windows(
     for (i, line_result) in lines.enumerate().skip(1) {
         // skip header row
         if let Ok(line) = line_result {
-            if i % 100_000 == 0 {
+            if i % 1_000_000 == 0 {
                 println!("Done with methylation site {i} ");
             }
 

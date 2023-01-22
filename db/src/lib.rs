@@ -77,11 +77,11 @@ pub async fn import_genes(note: String, filename: String, db: Pool<Postgres>) ->
 }
 
 pub async fn import_sites(
-    sample: String,
+    sample: &str,
     generation: i32,
     layer: i32,
-    filename: String,
-    db: Pool<Postgres>,
+    filename: &str,
+    db: &Pool<Postgres>,
 ) -> Result<()> {
     let lines = lines_from_file(&filename)?;
     let mut rows_affected = 0;
@@ -90,27 +90,32 @@ pub async fn import_sites(
             continue;
         }
         let site = MethylationSite::from_methylome_file_line(
-            &line.expect("Line should not be an error after the check"),
+            &line
+                .as_ref()
+                .expect("Line should not be an error after the check"),
             false,
         );
-        if let Ok(s) = site {
-            rows_affected += sqlx::query!(
-                r#"INSERT INTO methylome (chromosome, location, context, count_methylated, strand, count_total, posteriormax, status, meth_lvl,generation, layer, sample) VALUES($1,$2,$3,$4,$5,$6, $7,$8,$9, $10, $11, $12)"#,
-                s.chromosome as i32,
-                s.location,
-                s.context,
-                s.count_methylated as i32,
-                s.strand as Strand,
-                s.count_total as i32,
-                s.posteriormax,
-                s.status as i8,
-                s.meth_lvl,
-                generation,
-                layer,
-                sample
-            )
-            .execute(&db)
-            .await?.rows_affected();
+        match site {
+            Err(e) => println!("{e} when parsing: {}", line.unwrap()),
+            Ok(s) => {
+                rows_affected += sqlx::query!(
+                    r#"INSERT INTO methylome (chromosome, location, context, count_methylated, strand, count_total, posteriormax, status, meth_lvl,generation, layer, sample) VALUES($1,$2,$3,$4,$5,$6, $7,$8,$9, $10, $11, $12)"#,
+                    s.chromosome as i32,
+                    s.location,
+                    s.context,
+                    s.count_methylated as i32,
+                    s.strand as Strand,
+                    s.count_total as i32,
+                    s.posteriormax,
+                    s.status as i8,
+                    s.meth_lvl,
+                    generation,
+                    layer,
+                    sample
+                )
+                .execute(db)
+                .await?.rows_affected();
+            }
         }
     }
     println!("{rows_affected} annotations were anned to the database!");
