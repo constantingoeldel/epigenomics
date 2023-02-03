@@ -40,6 +40,12 @@ pub struct GenesByStrand {
     pub antisense: Vec<Gene>,
 }
 
+impl Default for GenesByStrand {
+    fn default() -> Self {
+        GenesByStrand::new()
+    }
+}
+
 impl GenesByStrand {
     pub fn new() -> Self {
         GenesByStrand {

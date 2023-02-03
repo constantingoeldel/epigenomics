@@ -73,15 +73,15 @@ impl MethylationSite {
                         posteriormax: posteriormax.parse::<f32>()?,
                         status: status
                             .chars()
-                            .nth(0)
-                            .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                            .next()
+                            .ok_or(Error::Simple("Status could not be parsed"))?,
                         meth_lvl: meth_lvl.parse::<f32>()?,
                         context_trinucleotide: String::from("XXX"),
                     })
                 },
             );
-        if first_format.is_some() {
-            return first_format.unwrap();
+        if let Some(site) = first_format {
+            return site;
         }
         let second_format: Option<Result<MethylationSite>> = s
             .split('\t')
@@ -115,16 +115,16 @@ impl MethylationSite {
                         posteriormax: posteriormax.parse::<f32>()?,
                         status: status
                             .chars()
-                            .nth(0)
-                            .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                            .next()
+                            .ok_or(Error::Simple("Status could not be parsed"))?,
                         meth_lvl: meth_lvl.parse::<f32>()?,
                         context_trinucleotide: String::from(trinucleotide),
                     })
                 },
             );
 
-        if second_format.is_some() {
-            return second_format.unwrap();
+        if let Some(site) = second_format {
+            return site;
         }
         let third_format: Option<Result<MethylationSite>> = s
             .split('\t')
@@ -163,8 +163,8 @@ impl MethylationSite {
                         posteriormax: posteriormax.parse::<f32>()?,
                         status: status
                             .chars()
-                            .nth(0)
-                            .ok_or_else(|| Error::Simple("Status could not be parsed"))?,
+                            .next()
+                            .ok_or(Error::Simple("Status could not be parsed"))?,
                         meth_lvl: meth_lvl.parse::<f32>()?,
                         context_trinucleotide: String::from("XXX"),
                     })
@@ -312,20 +312,20 @@ mod tests {
 
     const HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Sense);
     const LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Sense);
-    const ANTI_GENE: Gene = Gene {
-        annotation: String::new(),
-        chromosome: 1,
-        start: 50,
-        end: 100,
-        strand: Strand::Antisense,
-        name: String::new(),
-    };
-    const ANTI_WITHIN_CG: MethylationSite = MethylationSite::new(80, Strand::Antisense);
+    // const ANTI_GENE: Gene = Gene {
+    //     annotation: String::new(),
+    //     chromosome: 1,
+    //     start: 50,
+    //     end: 100,
+    //     strand: Strand::Antisense,
+    //     name: String::new(),
+    // };
+    // const ANTI_WITHIN_CG: MethylationSite = MethylationSite::new(80, Strand::Antisense);
 
-    const ANTI_OPPOSITE_STRAND_CG: MethylationSite = MethylationSite::new(80, Strand::Sense);
+    // const ANTI_OPPOSITE_STRAND_CG: MethylationSite = MethylationSite::new(80, Strand::Sense);
 
-    const ANTI_HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Antisense);
-    const ANTI_LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Antisense);
+    // const ANTI_HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Antisense);
+    // const ANTI_LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Antisense);
 
     #[test]
     fn test_instantiate_from_methylome_file_line() {
@@ -402,6 +402,8 @@ mod tests {
             output_dir: String::from("also not relevant"),
             window_size: 2,
             window_step: 1,
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
         };
         let all_within_gene = Gene {
             annotation: String::new(),
@@ -458,7 +460,8 @@ mod tests {
     fn test_place_site_relative_acting_like_absolute() {
         let args = Args {
             db: false,
-
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             invert: false,
             absolute: false,
             cutoff: 100,
@@ -513,7 +516,8 @@ mod tests {
     fn test_place_site_relative() {
         let args = Args {
             db: false,
-
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             invert: false,
             absolute: false,
             cutoff: 1000,
@@ -589,7 +593,8 @@ mod tests {
 
         let args = Args {
             db: false,
-
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             invert: false,
             absolute: false,
             cutoff: 2048,
@@ -643,7 +648,8 @@ mod tests {
 
         let args = Args {
             db: false,
-
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             invert: false,
             absolute: true,
             cutoff: 2048,
@@ -680,7 +686,8 @@ mod tests {
     fn test_place_site_relative_antisense() {
         let args = Args {
             db: false,
-
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             invert: false,
             absolute: false,
             cutoff: 1000,
@@ -740,6 +747,8 @@ mod tests {
     #[test]
     fn test_place_site_absolute_invert() {
         let args = Args {
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             db: false,
             invert: true,
             absolute: true,

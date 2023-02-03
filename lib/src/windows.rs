@@ -48,6 +48,34 @@ impl Windows {
             Region::Downstream => &mut self.downstream,
         }
     }
+
+    pub fn iter_upstream(
+        &self,
+    ) -> std::slice::Iter<'_, std::vec::Vec<methylation_site::MethylationSite>> {
+        self.upstream.iter()
+    }
+
+    pub fn iter_gene(
+        &self,
+    ) -> std::slice::Iter<'_, std::vec::Vec<methylation_site::MethylationSite>> {
+        self.gene.iter()
+    }
+
+    pub fn iter_downstream(
+        &self,
+    ) -> std::slice::Iter<'_, std::vec::Vec<methylation_site::MethylationSite>> {
+        self.downstream.iter()
+    }
+
+    pub fn combined(&self) -> Vec<Vec<MethylationSite>> {
+        let combined = vec![
+            self.upstream.clone(),
+            self.gene.clone(),
+            self.downstream.clone(),
+        ];
+        combined.concat()
+    }
+
     pub fn inverse(mut self) -> Self {
         self.upstream = self.downstream.iter().rev().map(|a| a.to_owned()).collect();
         self.gene = self.gene.iter().rev().map(|a| a.to_owned()).collect();
@@ -55,30 +83,31 @@ impl Windows {
         self
     }
 
-    pub fn distribution(&self) -> String {
+    pub fn steady_state_methylation(&self) -> Vec<f32> {
+        self.combined()
+            .iter()
+            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f32)
+            .collect()
+    }
+
+    pub fn print_steady_state_methylation(methylations: &[f32]) -> String {
+        let mut output = String::new();
+        for (i, average) in methylations.iter().enumerate() {
+            output.push_str(&format!("{};{}\n", i, average));
+        }
+        output
+    }
+
+    pub fn distribution(&self) -> Vec<i32> {
+        self.combined().iter().map(|w| w.len() as i32).collect()
+    }
+
+    pub fn print_distribution(distribution: &[i32]) -> String {
         // In CSV format
         let mut output = String::new();
-        output += "Upstream\n";
-        for (i, window) in self.upstream.iter().enumerate() {
-            output.push_str(&format!("{};{}\n", i, window.len()));
-        }
-        output += "Gene\n";
-        for (i, window) in self.gene.iter().enumerate() {
-            output.push_str(&format!("{};{}\n", i, window.len()));
-        }
-        output += "Downstream\n";
-        for (i, window) in self.downstream.iter().enumerate() {
-            output.push_str(&format!("{};{}\n", i, window.len()));
-        }
-        output += "Combined\n";
-        for (i, window) in self
-            .upstream
-            .iter()
-            .chain(self.gene.iter())
-            .chain(self.downstream.iter())
-            .enumerate()
-        {
-            output.push_str(&format!("{};{}\n", i, window.len()));
+
+        for (i, count) in distribution.iter().enumerate() {
+            output.push_str(&format!("{};{}\n", i, count));
         }
 
         output
@@ -161,11 +190,15 @@ impl Display for Windows {
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+
     use crate::arguments::Args;
 
     #[test]
     fn new_absolute() {
         let args = Args {
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             db: false,
             invert: false,
             methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
@@ -187,7 +220,8 @@ mod test {
     fn new_relative() {
         let args = Args {
             db: false,
-
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
             invert: false,
             methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
             genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"

@@ -39,4 +39,30 @@ pub struct Args {
     /// Use a Postgres database to do everything
     #[arg(long, default_value_t = true)]
     pub db: bool,
+
+    /// Provide an edgefile
+    #[arg(long, short)]
+    pub edges: std::path::PathBuf,
+
+    /// Provide a nodefile - paths will be updated to match the output directory
+    #[arg(long, short)]
+    pub nodes: std::path::PathBuf,
 }
+
+// impl Args {
+//     fn default() -> Self {
+//         Args {
+//             db: false,
+//             invert: false,
+//             absolute: false,
+//             cutoff: 2048,
+//             genome: String::from("default"),
+//             methylome: String::from("also default"),
+//             output_dir: String::from("also default"),
+//             window_size: 5,
+//             window_step: 1,
+//             edges: PathBuf::new(),
+//             nodes: PathBuf::new(),
+//         }
+//     }
+// }

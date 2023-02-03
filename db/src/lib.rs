@@ -1,12 +1,10 @@
 use lib::{
-    arguments::Args,
     files::lines_from_file,
     methylation_site::MethylationSite,
     structs::{Gene, Result, Strand},
-    windows::Windows,
 };
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
-use std::{collections::HashMap, env};
+use std::env;
 
 pub async fn connect() -> Result<Pool<Postgres>> {
     let pool = PgPoolOptions::new()
@@ -19,33 +17,33 @@ pub async fn connect() -> Result<Pool<Postgres>> {
     Ok(pool)
 }
 
-pub async fn windows(args: Args, db: Pool<Postgres>) -> Result<HashMap<String, Windows>> {
-    let mut results: HashMap<String, Windows> = HashMap::new();
-    for generation in [0, 1, 2, 4, 5, 8, 11] {
-        for layer in [0, 2, 8] {
-            if (generation != 0 && layer == 0) || (generation == 0 && layer != 0) {
-                continue;
-            }
-            for percentile in 0..100 {
-                let filename = format!("{}", &args.output_dir)
-                    + &format!("/{percentile}/methylome_Col0_G{generation}_L{layer}_All.txt");
+// pub async fn windows(args: Args, db: Pool<Postgres>) -> Result<HashMap<String, Windows>> {
+//     let results: HashMap<String, Windows> = HashMap::new();
+//     for generation in [0, 1, 2, 4, 5, 8, 11] {
+//         for layer in [0, 2, 8] {
+//             if (generation != 0 && layer == 0) || (generation == 0 && layer != 0) {
+//                 continue;
+//             }
+//             for percentile in 0..100 {
+//                 let filename = format!("{}", &args.output_dir)
+//                     + &format!("/{percentile}/methylome_Col0_G{generation}_L{layer}_All.txt");
 
-                let mut windows = Windows::new(100, &args);
-                // let result: Vec<MethylationSite> = sqlx::query_file_as!(
-                //     MethylationSite,
-                //     "./window.sql",
-                //     percentile,
-                //     generation,
-                //     layer
-                // )
-                // .fetch_all(&db)
-                // .await?;
-                // results.insert(filename, windows);
-            }
-        }
-    }
-    Ok(results)
-}
+//                 let mut windows = Windows::new(100, &args);
+//                 // let result: Vec<MethylationSite> = sqlx::query_file_as!(
+//                 //     MethylationSite,
+//                 //     "./window.sql",
+//                 //     percentile,
+//                 //     generation,
+//                 //     layer
+//                 // )
+//                 // .fetch_all(&db)
+//                 // .await?;
+//                 // results.insert(filename, windows);
+//             }
+//         }
+//     }
+//     Ok(results)
+// }
 
 pub async fn import_genes(note: String, filename: String, db: Pool<Postgres>) -> Result<()> {
     let lines = lines_from_file(&filename)?;
@@ -83,15 +81,14 @@ pub async fn import_sites(
     filename: &str,
     db: &Pool<Postgres>,
 ) -> Result<()> {
-    let lines = lines_from_file(&filename)?;
+    let lines = lines_from_file(filename)?;
     let mut rows_affected = 0;
     for line in lines {
         if line.is_err() {
             continue;
         }
         let site = MethylationSite::from_methylome_file_line(
-            &line
-                .as_ref()
+            line.as_ref()
                 .expect("Line should not be an error after the check"),
             false,
         );

@@ -9,10 +9,10 @@ use std::{
     fs::{self, File},
     io::{self, BufRead},
     path::PathBuf,
+    sync::Mutex,
 };
 use structs::*;
 use windows::*;
-
 pub mod arguments;
 pub mod error;
 pub mod files;
@@ -98,7 +98,10 @@ pub fn extract(args: Args) -> Result<()> {
         println!("The maximum gene length is {} bp", max_gene_length);
     }
 
-    set_up_output_dir(max_gene_length, args.clone())?;
+    set_up_output_dir(args.clone(), max_gene_length)?;
+
+    let distributions = Mutex::new(Vec::new());
+    let steady_state_methylations = Mutex::new(Vec::new());
 
     methylome_files.par_iter().try_for_each_with(
         structured_genes,
@@ -110,15 +113,33 @@ pub fn extract(args: Args) -> Result<()> {
                 windows = windows.inverse();
             }
             windows.save(&args, filename)?;
-            let distribution = windows.distribution();
-            let path = format!(
-                "{}/{}_distribution.txt",
-                &args.output_dir,
-                filename.to_str().unwrap()
-            );
-            fs::write(path, distribution)?;
+            distributions.lock().unwrap().push(windows.distribution());
+            steady_state_methylations
+                .lock()
+                .unwrap()
+                .push(windows.steady_state_methylation());
+
             Ok(())
         },
+    )?;
+    let sample_size = steady_state_methylations.lock().unwrap().len();
+    let mut average_methylation = vec![0.0; steady_state_methylations.lock().unwrap()[0].len()];
+    for source in steady_state_methylations.lock().unwrap().iter() {
+        for (i, window) in source.iter().enumerate() {
+            average_methylation[i] += window / sample_size as f32
+        }
+    }
+
+    let distribution_file = format!("{}/distribution.txt", &args.output_dir);
+    let methylation_file = format!("{}/steady_state_methylation.txt", &args.output_dir);
+
+    fs::write(
+        distribution_file,
+        Windows::print_distribution(&distributions.lock().unwrap()[0]),
+    )?;
+    fs::write(
+        methylation_file,
+        Windows::print_steady_state_methylation(&average_methylation),
     )?;
 
     println!("Done in: {:?}", start.elapsed());
