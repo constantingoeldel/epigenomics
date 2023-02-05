@@ -1,7 +1,7 @@
 use crate::{arguments::Args, error::Error};
 
 use files::*;
-use methylation_site::*;
+pub use methylation_site::*;
 use rayon::prelude::*;
 use setup::set_up_output_dir;
 use std::{
@@ -126,7 +126,7 @@ pub fn extract(args: Args) -> Result<()> {
     let mut average_methylation = vec![0.0; steady_state_methylations.lock().unwrap()[0].len()];
     for source in steady_state_methylations.lock().unwrap().iter() {
         for (i, window) in source.iter().enumerate() {
-            average_methylation[i] += window / sample_size as f32
+            average_methylation[i] += window / sample_size as f64
         }
     }
 

@@ -83,14 +83,14 @@ impl Windows {
         self
     }
 
-    pub fn steady_state_methylation(&self) -> Vec<f32> {
+    pub fn steady_state_methylation(&self) -> Vec<f64> {
         self.combined()
             .iter()
-            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f32)
+            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
             .collect()
     }
 
-    pub fn print_steady_state_methylation(methylations: &[f32]) -> String {
+    pub fn print_steady_state_methylation(methylations: &[f64]) -> String {
         let mut output = String::new();
         for (i, average) in methylations.iter().enumerate() {
             output.push_str(&format!("{};{}\n", i, average));

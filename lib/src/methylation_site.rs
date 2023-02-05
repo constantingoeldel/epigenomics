@@ -13,9 +13,9 @@ pub struct MethylationSite {
     pub context: String,
     pub count_methylated: u32,
     pub count_total: u32,
-    pub posteriormax: f32,
+    pub posteriormax: f64,
     pub status: char,
-    pub meth_lvl: f32,
+    pub meth_lvl: f64,
     pub context_trinucleotide: String,
 }
 
@@ -35,6 +35,19 @@ impl MethylationSite {
             context_trinucleotide: String::new(),
         }
     }
+
+    /// Convert status to numeric value following the AlphaBeta paper.
+    /// u/u => 0
+    /// u/m => 1
+    /// m/m => 2
+    pub fn status_numeric(&self) -> u8 {
+        match self.status {
+            'M' => 2,
+            'U' => 0,
+            _ => 1,
+        }
+    }
+
     /// Create a new CG site from a line of a methylation file.
     /// Only yields a CG site if the line is formatted correctly and is a CG site.
     /// If invalid, an error is returned.
@@ -70,12 +83,12 @@ impl MethylationSite {
                         context: String::from(context),
                         count_methylated: count_methylated.parse::<u32>()?,
                         count_total: count_total.parse::<u32>()?,
-                        posteriormax: posteriormax.parse::<f32>()?,
+                        posteriormax: posteriormax.parse::<f64>()?,
                         status: status
                             .chars()
                             .next()
                             .ok_or(Error::Simple("Status could not be parsed"))?,
-                        meth_lvl: meth_lvl.parse::<f32>()?,
+                        meth_lvl: meth_lvl.parse::<f64>()?,
                         context_trinucleotide: String::from("XXX"),
                     })
                 },
@@ -112,12 +125,12 @@ impl MethylationSite {
                         context: String::from(context),
                         count_methylated: count_methylated.parse::<u32>()?,
                         count_total: count_total.parse::<u32>()?,
-                        posteriormax: posteriormax.parse::<f32>()?,
+                        posteriormax: posteriormax.parse::<f64>()?,
                         status: status
                             .chars()
                             .next()
                             .ok_or(Error::Simple("Status could not be parsed"))?,
-                        meth_lvl: meth_lvl.parse::<f32>()?,
+                        meth_lvl: meth_lvl.parse::<f64>()?,
                         context_trinucleotide: String::from(trinucleotide),
                     })
                 },
@@ -160,12 +173,12 @@ impl MethylationSite {
                         context: String::from(context),
                         count_methylated: count_methylated.parse::<u32>()?,
                         count_total: count_total.parse::<u32>()?,
-                        posteriormax: posteriormax.parse::<f32>()?,
+                        posteriormax: posteriormax.parse::<f64>()?,
                         status: status
                             .chars()
                             .next()
                             .ok_or(Error::Simple("Status could not be parsed"))?,
-                        meth_lvl: meth_lvl.parse::<f32>()?,
+                        meth_lvl: meth_lvl.parse::<f64>()?,
                         context_trinucleotide: String::from("XXX"),
                     })
                 },
@@ -225,13 +238,13 @@ impl MethylationSite {
         args: &Args,
     ) -> Vec<(Region, usize)> // Return a vector of (strand, window) tuples for each window the CG site is in
     {
-        const E: f32 = 0.1; // Epsilon for floating point comparison
-        let location = self.location as f32;
-        let cutoff = args.cutoff as f32;
-        let step = args.window_step as f32;
-        let size = args.window_size as f32;
-        let start = gene.start as f32;
-        let end = gene.end as f32;
+        const E: f64 = 0.1; // Epsilon for floating point comparison
+        let location = self.location as f64;
+        let cutoff = args.cutoff as f64;
+        let step = args.window_step as f64;
+        let size = args.window_size as f64;
+        let start = gene.start as f64;
+        let end = gene.end as f64;
         let length = end - start;
 
         // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
@@ -270,7 +283,7 @@ impl MethylationSite {
         }
 
         for (i, window) in local_windows.iter_mut().enumerate() {
-            let lower_bound = i as f32 * step - E;
+            let lower_bound = i as f64 * step - E;
             let upper_bound = lower_bound + size + E;
 
             if position >= lower_bound && position <= upper_bound {
