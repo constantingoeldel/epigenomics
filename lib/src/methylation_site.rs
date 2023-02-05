@@ -141,9 +141,9 @@ impl MethylationSite {
         }
 
         let bigwig_format: Option<Result<MethylationSite>> =
-            s.split("\t")
+            s.split('\t')
                 .collect_tuple()
-                .map(|(chromosome, start, end, name, _some_number)| {
+                .map(|(chromosome, start, end, _name, _some_number)| {
                     let start = start.parse::<u32>()?;
                     let end = end.parse::<u32>()?;
                     let location_as_midpoint = start + start.abs_diff(end) / 2;

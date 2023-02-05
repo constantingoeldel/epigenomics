@@ -1,13 +1,13 @@
-macro_rules! assert_close_epsilon {
-    ($x:expr, $y:expr, $d:expr) => {
-        if !(($x - $y).abs() < $d) {
-            panic!(
-                "assertion failed: `abs(left - right) < {}`, (left: `{}`, right: `{}`)",
-                $d, $x, $y
-            );
-        }
-    };
-}
+// macro_rules! assert_close_epsilon {
+//     ($x:expr, $y:expr, $d:expr) => {
+//         if !(($x - $y).abs() < $d) {
+//             panic!(
+//                 "assertion failed: `abs(left - right) < {}`, (left: `{}`, right: `{}`)",
+//                 $d, $x, $y
+//             );
+//         }
+//     };
+// }
 #[macro_export]
 macro_rules! assert_close {
     ($x:expr, $y:expr ) => {

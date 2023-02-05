@@ -1,5 +1,5 @@
 use std::sync::{
-    atomic::{AtomicI32, Ordering},
+    atomic::{AtomicU32, Ordering},
     Mutex,
 };
 
@@ -12,7 +12,7 @@ pub fn run(
     p0uu: f64,
     eqp: f64,
     eqp_weight: f64,
-    n_starts: i32,
+    n_starts: u32,
 ) -> Result<Model, Box<dyn std::error::Error>> {
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
@@ -25,7 +25,7 @@ pub fn run(
     assert_eq!(p0mm + p0uu + p0um, 1.0);
 
     let results: Mutex<Vec<Model>> = Mutex::new(Vec::new());
-    let counter = AtomicI32::new(0);
+    let counter = AtomicU32::new(0);
     // Optimization loop
     (0..n_starts).into_par_iter().for_each(|_| {
         // Draw random starting values
@@ -137,7 +137,7 @@ pub fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
     // Takes quite a while to run
     //     #[test]
     //     fn it_calculates_model() {

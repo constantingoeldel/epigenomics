@@ -1,9 +1,8 @@
 use rayon::prelude::*;
 use std::{
     ops::Div,
-    result,
     sync::{
-        atomic::{AtomicI32, Ordering},
+        atomic::{AtomicU32, Ordering},
         Mutex,
     },
 };
@@ -19,7 +18,7 @@ pub fn run(
     p0uu: f64,
     eqp: f64,
     eqp_weight: f64,
-    n_boot: i32,
+    n_boot: u32,
 ) -> Result<StandardDeviations, Box<dyn std::error::Error>> {
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
@@ -28,9 +27,9 @@ pub fn run(
 
     // Alpha, Beta, Weight, Intercept, pr_mm, pr_um, pr_uu
     let results = Mutex::new(Array2::zeros((n_boot as usize, 7)));
-    let mut counter = AtomicI32::new(0);
+    let counter = AtomicU32::new(0);
     // Optimization loop
-    (0..n_boot).into_par_iter().for_each(|i| {
+    (0..n_boot).into_par_iter().for_each(|_i| {
         let problem = Problem {
             pedigree: pedigree.clone(),
             eqp_weight,
@@ -70,8 +69,8 @@ pub fn run(
             .unwrap()
             .push(Axis(0), r.view())
             .expect("Insertion failed");
-        let c = counter.fetch_add(1, Ordering::SeqCst);
-        println!("Progress: {}%", (c * 100 / (n_boot)));
+        let c = counter.fetch_add(1, Ordering::Relaxed);
+        println!("Progress: {}%", ((c * 100) as f32 / (n_boot) as f32));
     });
     let results = results.into_inner().unwrap();
     // Standard deviations

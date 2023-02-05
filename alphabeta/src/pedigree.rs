@@ -60,6 +60,9 @@ impl Pedigree {
         let mut pedigree = Array2::<f64>::zeros((0, 4));
         let file = std::fs::read_to_string(filename).unwrap();
         file.split('\n').skip(1).for_each(|line| {
+            if line.is_empty() {
+                return;
+            }
             let mut entries = line.split(' ');
             let row = [
                 entries.next().unwrap().parse::<f64>().unwrap(),
@@ -86,7 +89,6 @@ impl Pedigree {
     pub fn build(
         nodelist: &Path,
         edgelist: &Path,
-        cytosine: String,
         posterior_max_filter: f64,
     ) -> Result<(Self, f64), Error> {
         println!(
@@ -127,7 +129,7 @@ impl Pedigree {
             .split('\n')
             .skip(1)
             .filter_map(|line| {
-                let mut entries = line.split('\t');
+                let mut entries = line.split(['\t', ' ', ',']);
                 let from = entries.next()?;
                 let to = entries.next()?;
                 Some(Edge {
@@ -160,7 +162,7 @@ impl Pedigree {
 
                 sites.push(methylation);
             }
-
+            dbg!(sites.len());
             let p_uu = sites.iter().filter(|s| s.status == 'U').count() as f64 / sites.len() as f64;
             let avg_meth_lvl = sites.iter().map(|s| s.meth_lvl).sum::<f64>() / sites.len() as f64;
 
@@ -174,7 +176,7 @@ impl Pedigree {
             .sum::<f64>()
             / nodes.len() as f64;
 
-        println!("finalizing pedegree data...");
+        println!("finalizing pedigree data...");
 
         let divergence = DMatrix::from(&nodes, posterior_max_filter);
         let pedigree = divergence.convert(&nodes, &edges);
@@ -238,12 +240,12 @@ impl DMatrix {
                 println!("Done! Divergence: {divergence}");
             }
         }
-
         DMatrix(divergences)
     }
     /// Convert graph of divergences to pedigree
     fn convert(&self, nodes: &[Node], edges: &[Edge]) -> Pedigree {
         //  dbg!(&self.0);
+
         let e = edges
             .iter()
             .map(|e| {
@@ -329,11 +331,29 @@ mod tests {
         let nodelist = Path::new("./data/nodelist.txt");
         let edgelist = Path::new("./data/edgelist.txt");
 
-        let pedigree = Pedigree::build(nodelist, edgelist, String::from("CG"), 0.99)
-            .expect("Could not build pedigree");
+        let pedigree = Pedigree::build(nodelist, edgelist, 0.99).expect("Could not build pedigree");
 
         assert_eq!(pedigree.0.shape(), &[4 * 3 / 2, 4]);
         pedigree.0.to_file("./data/pedigree_generated.txt");
         assert_close!(pedigree.1, 0.527279);
+    }
+
+    #[test]
+    fn wildtype_pedigree() {
+        let nodelist = Path::new("./data/desired_output/nodelist.fn");
+        let edgelist = Path::new("./data/desired_output/edgelist.fn");
+        let comparison = Pedigree::from_file(
+            "./data/desired_output/pedigree-pdata_epimutation_rate_estimation_window_gene_0.txt",
+        );
+
+        let pedigree = Pedigree::build(nodelist, edgelist, 0.99).expect("Could not build pedigree");
+
+        assert_close!(pedigree.1, 0.991008120326199);
+
+        let pedigree = pedigree.0;
+
+        for (i, j) in pedigree.iter().zip(comparison.iter()) {
+            assert_close!(i, j);
+        }
     }
 }
