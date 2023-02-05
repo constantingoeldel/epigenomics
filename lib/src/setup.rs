@@ -1,6 +1,6 @@
 use crate::*;
 
-pub fn set_up_output_dir(args: Args, max_gene_length: i32) -> Result<()> {
+pub fn set_up_output_dir(args: Args, max_gene_length: u32) -> Result<()> {
     let output_dir = PathBuf::from(&args.output_dir).canonicalize()?;
     fs::read_dir(&output_dir).map_err(|_| {
         Error::File(

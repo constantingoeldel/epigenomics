@@ -1,6 +1,6 @@
 use std::sync::{
     atomic::{AtomicI32, Ordering},
-    Arc, Mutex,
+    Mutex,
 };
 
 use crate::*;
@@ -25,9 +25,9 @@ pub fn run(
     assert_eq!(p0mm + p0uu + p0um, 1.0);
 
     let results: Mutex<Vec<Model>> = Mutex::new(Vec::new());
-    let mut counter = AtomicI32::new(0);
+    let counter = AtomicI32::new(0);
     // Optimization loop
-    (0..n_starts).into_par_iter().for_each(|i| {
+    (0..n_starts).into_par_iter().for_each(|_| {
         // Draw random starting values
 
         let problem = Problem {
@@ -67,7 +67,7 @@ pub fn run(
 
         results.lock().unwrap().push(m);
         let c = counter.fetch_add(1, Ordering::SeqCst);
-        println!("Progress: {}%", (c * 100 / (n_starts)));
+        println!("Progress: {}%", ((c * 100) as f32 / (n_starts) as f32));
     });
     let mut results = results.into_inner().unwrap();
     // Calculating the least squares error for all results and selecting the best one

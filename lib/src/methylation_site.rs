@@ -7,7 +7,7 @@ use crate::*;
 #[derive(Clone, PartialEq, Debug)]
 pub struct MethylationSite {
     pub chromosome: u8,
-    pub location: i32,
+    pub location: u32,
     pub strand: Strand,
     pub original: String,
     pub context: String,
@@ -20,7 +20,7 @@ pub struct MethylationSite {
 }
 
 impl MethylationSite {
-    const fn new(location: i32, strand: Strand) -> Self {
+    const fn new(location: u32, strand: Strand) -> Self {
         MethylationSite {
             chromosome: 0,
             location,
@@ -73,7 +73,7 @@ impl MethylationSite {
                 )| {
                     Ok(MethylationSite {
                         chromosome: chromosome.parse::<u8>()?,
-                        location: location.parse::<i32>()?,
+                        location: location.parse::<u32>()?,
                         strand: if (strand == "+") ^ invert_strand {
                             Strand::Sense
                         } else {
@@ -115,7 +115,7 @@ impl MethylationSite {
                 )| {
                     Ok(MethylationSite {
                         chromosome: chromosome.parse::<u8>()?,
-                        location: location.parse::<i32>()?,
+                        location: location.parse::<u32>()?,
                         strand: if (strand == "+") ^ invert_strand {
                             Strand::Sense
                         } else {
@@ -139,6 +139,34 @@ impl MethylationSite {
         if let Some(site) = second_format {
             return site;
         }
+
+        let bigwig_format: Option<Result<MethylationSite>> =
+            s.split("\t")
+                .collect_tuple()
+                .map(|(chromosome, start, end, name, _some_number)| {
+                    let start = start.parse::<u32>()?;
+                    let end = end.parse::<u32>()?;
+                    let location_as_midpoint = start + start.abs_diff(end) / 2;
+
+                    Ok(MethylationSite {
+                        chromosome: chromosome.chars().nth(3).unwrap().to_string().parse()?,
+                        strand: Strand::Unknown,
+                        location: location_as_midpoint,
+                        context: String::from("H2AZ"),
+                        context_trinucleotide: String::new(),
+                        count_methylated: 0,
+                        count_total: 0,
+                        meth_lvl: 0.0,
+                        original: s.to_owned(),
+                        posteriormax: 0.0,
+                        status: 'X',
+                    })
+                });
+
+        if let Some(site) = bigwig_format {
+            return site;
+        }
+
         let third_format: Option<Result<MethylationSite>> = s
             .split('\t')
             .collect_tuple()
@@ -160,9 +188,9 @@ impl MethylationSite {
                     Ok(MethylationSite {
                         chromosome: chromosome.parse()?,
                         location: if strand == "+" {
-                            first_nucleotide.parse::<i32>()?
+                            first_nucleotide.parse::<u32>()?
                         } else {
-                            second_nucleotide.parse::<i32>()?
+                            second_nucleotide.parse::<u32>()?
                         },
                         strand: if (strand == "+") ^ invert_strand {
                             Strand::Sense
@@ -190,7 +218,7 @@ impl MethylationSite {
     /// To strictly check weather a CG site is within the gene region, pass a cutoff of 0.
     ///
     /// Passing a negative cutoff is possible but leads to undefined behaviour if used together with ``find_gene``.
-    pub fn is_in_gene(&self, gene: &Gene, cutoff: i32) -> bool {
+    pub fn is_in_gene(&self, gene: &Gene, cutoff: u32) -> bool {
         self.chromosome == gene.chromosome
             && gene.start <= self.location + cutoff
             && self.location <= gene.end + cutoff
@@ -205,7 +233,7 @@ impl MethylationSite {
     pub fn find_gene<'short, 'long>(
         &'short self,
         genome: &'long [GenesByStrand],
-        cutoff: i32,
+        cutoff: u32,
     ) -> Option<&'long Gene> {
         let chromosome = &genome[(self.chromosome - 1) as usize];
         let strand = match self.strand {

@@ -27,8 +27,8 @@ pub enum Region {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Gene {
     pub chromosome: u8,
-    pub start: i32,
-    pub end: i32,
+    pub start: u32,
+    pub end: u32,
     pub name: String,
     pub annotation: String,
     pub strand: Strand,
@@ -74,8 +74,8 @@ impl Gene {
             .collect_tuple()
             .map(|(chromosome, start, end, name, annotation, strand)| Gene {
                 chromosome: chromosome.parse::<u8>().unwrap(),
-                start: start.parse::<i32>().unwrap(),
-                end: end.parse::<i32>().unwrap(),
+                start: start.parse::<u32>().unwrap(),
+                end: end.parse::<u32>().unwrap(),
                 name: String::from(name),
                 annotation: String::from(annotation),
                 strand: if (strand == "+") ^ invert_strand {

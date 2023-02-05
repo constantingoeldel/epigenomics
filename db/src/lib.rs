@@ -60,8 +60,8 @@ pub async fn import_genes(note: String, filename: String, db: Pool<Postgres>) ->
             rows_affected += sqlx::query!(
                 r#"INSERT INTO annotations (chromosome, start, "end", name, strand, annotation) VALUES($1,$2,$3,$4,$5, $6)"#,
                 a.chromosome as i32,
-                a.start,
-                a.end,
+                a.start as i32,
+                a.end as i32,
                 a.name,
                 a.strand as Strand,
                 note
@@ -98,14 +98,14 @@ pub async fn import_sites(
                 rows_affected += sqlx::query!(
                     r#"INSERT INTO methylome (chromosome, location, context, count_methylated, strand, count_total, posteriormax, status, meth_lvl,generation, layer, sample) VALUES($1,$2,$3,$4,$5,$6, $7,$8,$9, $10, $11, $12)"#,
                     s.chromosome as i32,
-                    s.location,
-                    s.context,
+                    s.location as i32,
+                    s.context ,
                     s.count_methylated as i32,
                     s.strand as Strand,
                     s.count_total as i32,
-                    s.posteriormax,
+                    s.posteriormax as f32,
                     s.status as i8,
-                    s.meth_lvl,
+                    s.meth_lvl as f32,
                     generation,
                     layer,
                     sample

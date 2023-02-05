@@ -17,7 +17,7 @@ pub struct Windows {
 }
 
 impl Windows {
-    pub fn new(max_gene_length: i32, args: &Args) -> Self {
+    pub fn new(max_gene_length: u32, args: &Args) -> Self {
         let gene_window_count = if args.absolute {
             max_gene_length / args.window_step
         } else {
@@ -149,7 +149,7 @@ impl Windows {
 pub fn extract_windows(
     methylome_file: File,
     genome: Vec<GenesByStrand>,
-    max_gene_length: i32,
+    max_gene_length: u32,
     args: Args,
 ) -> Result<Windows> {
     let mut last_gene: Option<&Gene> = None;

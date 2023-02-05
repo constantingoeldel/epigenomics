@@ -77,7 +77,7 @@ pub fn extract(args: Args) -> Result<()> {
         gene_length_sum += g.end - g.start;
         strand.push(g.to_owned());
     });
-    let average_gene_length = gene_length_sum / genes.len() as i32;
+    let average_gene_length = gene_length_sum / genes.len() as u32;
     println!(
         "Average gene length: {} bp, {} genes, of which {} are on the sense strand and {} on the antisense strand",
         average_gene_length,
@@ -87,7 +87,7 @@ pub fn extract(args: Args) -> Result<()> {
     );
 
     // Determine the maximum gene length by iterating over all genes
-    let mut max_gene_length: i32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
+    let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%
     if args.absolute {
         for gene in &genes {
             let length = gene.end - gene.start;
@@ -108,7 +108,7 @@ pub fn extract(args: Args) -> Result<()> {
         |genome, (path, filename)| -> Result<()> {
             let file = open_file(path, filename)?;
             let mut windows =
-                extract_windows(file, genome.to_vec(), max_gene_length as i32, args.clone())?;
+                extract_windows(file, genome.to_vec(), max_gene_length as u32, args.clone())?;
             if args.invert {
                 windows = windows.inverse();
             }
