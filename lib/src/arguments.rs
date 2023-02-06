@@ -47,6 +47,10 @@ pub struct Args {
     /// Provide a nodefile - paths will be updated to match the output directory
     #[arg(long, short)]
     pub nodes: std::path::PathBuf,
+
+    /// Also run AlphaBeta on every window after extraction, results will be stored in the same directory as the segments
+    #[arg(long, default_value_t = false)]
+    pub alphabeta: bool,
 }
 
 // impl Args {

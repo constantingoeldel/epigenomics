@@ -197,6 +197,7 @@ mod test {
     #[test]
     fn new_absolute() {
         let args = Args {
+            alphabeta: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
             db: false,
@@ -219,6 +220,7 @@ mod test {
     #[test]
     fn new_relative() {
         let args = Args {
+            alphabeta: false,
             db: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),

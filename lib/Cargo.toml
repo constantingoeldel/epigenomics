@@ -13,6 +13,7 @@ thiserror = "1.0.37"
 rayon = "1.5"
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres" ] }
 
+
 [dev-dependencies]
 serial_test = "*"
 

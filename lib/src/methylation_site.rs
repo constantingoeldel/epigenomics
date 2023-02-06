@@ -474,6 +474,7 @@ mod tests {
             window_step: 1,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
+            alphabeta: false,
         };
         let all_within_gene = Gene {
             annotation: String::new(),
@@ -529,6 +530,7 @@ mod tests {
     #[test]
     fn test_place_site_relative_acting_like_absolute() {
         let args = Args {
+            alphabeta: false,
             db: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
@@ -586,6 +588,7 @@ mod tests {
     fn test_place_site_relative() {
         let args = Args {
             db: false,
+            alphabeta: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
             invert: false,
@@ -662,6 +665,7 @@ mod tests {
         };
 
         let args = Args {
+            alphabeta: false,
             db: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
@@ -717,6 +721,7 @@ mod tests {
         };
 
         let args = Args {
+            alphabeta: false,
             db: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
@@ -756,6 +761,7 @@ mod tests {
     fn test_place_site_relative_antisense() {
         let args = Args {
             db: false,
+            alphabeta: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
             invert: false,
@@ -817,6 +823,7 @@ mod tests {
     #[test]
     fn test_place_site_absolute_invert() {
         let args = Args {
+            alphabeta: false,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
             db: false,

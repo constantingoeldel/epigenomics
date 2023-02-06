@@ -75,7 +75,7 @@ impl Pedigree {
         Pedigree(pedigree)
     }
 
-    pub fn to_file(&self, filename: &str) {
+    pub fn to_file(&self, filename: &str) -> std::io::Result<()> {
         let mut file = File::create(filename).unwrap();
         let mut content = String::new();
         content += "time0\ttime1\ttime2\tD.value\n";
@@ -83,7 +83,6 @@ impl Pedigree {
             content.push_str(&format!("{}\t{}\t{}\t{}\n", row[0], row[1], row[2], row[3]));
         }
         file.write_all(content.as_bytes())
-            .expect("Could not write to output file");
     }
 
     pub fn build(

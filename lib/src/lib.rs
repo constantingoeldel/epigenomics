@@ -143,5 +143,6 @@ pub fn extract(args: Args) -> Result<()> {
     )?;
 
     println!("Done in: {:?}", start.elapsed());
+
     Ok(())
 }

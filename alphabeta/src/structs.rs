@@ -130,14 +130,13 @@ impl Model {
         (self.beta * ((1.0 - self.beta).powi(2) - (1.0 - self.alpha).powi(2) - 1.0))
             / ((self.alpha + self.beta) * ((self.alpha + self.beta - 1.0).powi(2) - 2.0))
     }
-    pub fn to_file(&self, filename: &str, errors: &StandardDeviations) {
+    pub fn to_file(&self, filename: &str, errors: &StandardDeviations) -> std::io::Result<()> {
         let mut file = File::create(filename).unwrap();
         let  content = format!(
             "Alpha {}\nBeta {}\nStandard_Errors_Alpha {}\nStandard_Errors_Beta {}\nStandard_Errors_Alpha_Beta {}\n", self.alpha, self.beta, errors.alpha, errors.beta, errors.alpha_beta
         );
 
         file.write_all(content.as_bytes())
-            .expect("Could not write to output file");
     }
 }
 

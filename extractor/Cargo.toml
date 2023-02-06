@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 lib = { path = "../lib" }
+alphabeta = { path = "../alphabeta" }
 clap = { version = "4.0.27", features = ["derive"] }
