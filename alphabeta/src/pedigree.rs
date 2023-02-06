@@ -353,14 +353,14 @@ mod tests {
         let pedigree = Pedigree::build(nodelist, edgelist, 0.99).expect("Could not build pedigree");
 
         assert_eq!(pedigree.0.shape(), &[4 * 3 / 2, 4]);
-        pedigree.0.to_file("./data/pedigree_generated.txt");
+        pedigree.0.to_file("./data/pedigree_generated.txt").unwrap();
         assert_close!(pedigree.1, 0.4567024);
     }
 
     #[test]
     fn wildtype_pedigree() {
-        let nodelist = Path::new("./data/desired_output/nodelist.fn");
-        let edgelist = Path::new("./data/desired_output/edgelist.fn");
+        let nodelist = Path::new("./data/desired_output/nodelist.txt");
+        let edgelist = Path::new("./data/desired_output/edgelist.txt");
         let comparison = Pedigree::from_file(
             "./data/desired_output/pedigree-pdata_epimutation_rate_estimation_window_gene_0.txt",
         );

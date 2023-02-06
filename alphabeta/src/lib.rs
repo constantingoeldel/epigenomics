@@ -50,8 +50,8 @@ mod tests {
     #[test] // Recommended to run with --release
     fn end_to_end() {
         let (pedigree, p0uu) = Pedigree::build(
-            Path::new("./data/desired_output/nodelist.fn"),
-            Path::new("./data/desired_output/edgelist.fn"),
+            Path::new("./data/desired_output/nodelist.txt"),
+            Path::new("./data/desired_output/edgelist.txt"),
             0.99,
         )
         .expect("Error while building pedigree: ");

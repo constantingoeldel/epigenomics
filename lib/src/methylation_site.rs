@@ -35,6 +35,7 @@ impl From<char> for MethylationStatus {
         match c {
             'M' => MethylationStatus::M,
             'I' => MethylationStatus::I,
+            'U' => MethylationStatus::U,
             _ => {
                 println!(
                     "Warning: Encountered invalid methylation status: {c}. Parsed as Unmethylated"

@@ -28,7 +28,7 @@ fn main() {
     let (pedigree, p0uu) =
         Pedigree::build(&args.nodelist, &args.edgelist, args.posterior_max_filter)
             .expect("Error while building pedigree: ");
-    pedigree.to_file("./data/pedigree_wt.txt");
+    pedigree.to_file("./data/pedigree_wt.txt").unwrap();
 
     let model = ABneutral::run(&pedigree, p0uu, p0uu, 1.0, args.iterations).expect("Model failed");
     let result = BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, args.iterations)
@@ -40,5 +40,7 @@ fn main() {
     println!("{result}");
     println!("##########");
     args.output.push("results.txt");
-    model.to_file(args.output.to_str().unwrap(), &result);
+    model
+        .to_file(args.output.to_str().unwrap(), &result)
+        .unwrap();
 }

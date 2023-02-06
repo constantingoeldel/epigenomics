@@ -21,7 +21,7 @@ pub mod setup;
 pub mod structs;
 pub mod windows;
 
-pub fn extract(args: Args) -> Result<()> {
+pub fn extract(args: Args) -> Result<u32> {
     let start = std::time::Instant::now();
     let mut args = args;
 
@@ -113,12 +113,16 @@ pub fn extract(args: Args) -> Result<()> {
                 windows = windows.inverse();
             }
             windows.save(&args, filename)?;
-            distributions.lock().unwrap().push(windows.distribution());
-            steady_state_methylations
-                .lock()
-                .unwrap()
-                .push(windows.steady_state_methylation());
-
+            let distribution = windows.distribution();
+            {
+                println!("GIt here");
+                distributions.lock().unwrap().push(distribution);
+                println!("end here");
+            }
+            let methylation = windows.steady_state_methylation();
+            {
+                steady_state_methylations.lock().unwrap().push(methylation);
+            }
             Ok(())
         },
     )?;
@@ -144,5 +148,5 @@ pub fn extract(args: Args) -> Result<()> {
 
     println!("Done in: {:?}", start.elapsed());
 
-    Ok(())
+    Ok(max_gene_length)
 }

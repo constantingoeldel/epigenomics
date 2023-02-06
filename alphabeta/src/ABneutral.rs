@@ -67,7 +67,7 @@ pub fn run(
         // dbg!(&m);
         results.lock().unwrap().push(m);
         let c = counter.fetch_add(1, Ordering::SeqCst);
-        println!("Progress: {}%", ((c * 100) as f32 / (n_starts) as f32));
+        //  println!("Progress: {}%", ((c * 100) as f32 / (n_starts) as f32));
     });
     let mut results = results.into_inner().unwrap();
     // Calculating the least squares error for all results and selecting the best one

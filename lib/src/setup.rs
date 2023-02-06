@@ -53,9 +53,9 @@ pub fn set_up_output_dir(args: Args, max_gene_length: u32) -> Result<()> {
                 Ok(_) => continue,
                 Err(_) => {
                     fs::create_dir_all(&path).unwrap();
-                    fs::write(path.to_owned() + "/nodelist.fn", nodelist)
+                    fs::write(path.to_owned() + "/nodelist.txt", nodelist)
                         .expect("Nodelist not writable at ");
-                    fs::write(path.to_owned() + "/edgelist.fn", &edgelist).expect("msg");
+                    fs::write(path.to_owned() + "/edgelist.txt", &edgelist).expect("msg");
                 }
             };
         }

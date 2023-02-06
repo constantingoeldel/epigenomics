@@ -65,7 +65,7 @@ pub fn run(
             .push(Axis(0), r.view())
             .expect("Insertion failed");
         let c = counter.fetch_add(1, Ordering::Relaxed);
-        println!("Progress: {}%", ((c * 100) as f32 / (n_boot) as f32));
+        //  println!("Progress: {}%", ((c * 100) as f32 / (n_boot) as f32));
     });
     let results = results.into_inner().unwrap();
     // Standard deviations

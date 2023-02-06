@@ -1,9 +1,11 @@
+use std::path::Path;
+
 use clap::Parser;
 use lib::{arguments::Args, *};
 
 fn main() {
     let args = Args::parse();
-    match extract(args) {
+    match extract(args.clone()) {
         Err(e) => println!("Error: {e}"),
         Ok(max_gene_length) => {
             if args.alphabeta {
@@ -19,15 +21,17 @@ fn main() {
 
                     for window in (0..=max).step_by(args.window_step as usize) {
                         let alphabeta_result = alphabeta::run(
-                            Path::from(
-                                args.output_dir + &format!("/{}/{}/nodelist.txt", side, window),
-                            ),
-                            Path::from(
-                                args.output_dir + &format!("/{}/{}/edgelist.txt", side, window),
-                            ),
+                            Path::new(&format!(
+                                "{}/{}/{}/nodelist.txt",
+                                &args.output_dir, side, window
+                            )),
+                            Path::new(&format!(
+                                "{}/{}/{}/edgelist.txt",
+                                &args.output_dir, side, window
+                            )),
                             0.99,
                             1000,
-                            args.output_dir + &format!("/{}/{}/", side, window),
+                            format!("{}/{}/{}/", &args.output_dir, side, window),
                         );
                         match alphabeta_result {
                             Err(e) => println!("Error: {e}"),

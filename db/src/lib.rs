@@ -1,7 +1,7 @@
 use lib::{
     files::lines_from_file,
     methylation_site::MethylationSite,
-    structs::{Gene, Result},
+    structs::{Gene, Result, Strand},
 };
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::env;

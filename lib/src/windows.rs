@@ -67,15 +67,6 @@ impl Windows {
         self.downstream.iter()
     }
 
-    pub fn combined(&self) -> Vec<Vec<MethylationSite>> {
-        let combined = vec![
-            self.upstream.clone(),
-            self.gene.clone(),
-            self.downstream.clone(),
-        ];
-        combined.concat()
-    }
-
     pub fn inverse(mut self) -> Self {
         self.upstream = self.downstream.iter().rev().map(|a| a.to_owned()).collect();
         self.gene = self.gene.iter().rev().map(|a| a.to_owned()).collect();
@@ -84,10 +75,25 @@ impl Windows {
     }
 
     pub fn steady_state_methylation(&self) -> Vec<f64> {
-        self.combined()
+        let mut upstream: Vec<f64> = self
+            .upstream
             .iter()
             .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
-            .collect()
+            .collect();
+        let mut gene: Vec<f64> = self
+            .gene
+            .iter()
+            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
+            .collect();
+        let mut downstream: Vec<f64> = self
+            .downstream
+            .iter()
+            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
+            .collect();
+
+        gene.append(&mut downstream);
+        upstream.append(&mut gene);
+        upstream
     }
 
     pub fn print_steady_state_methylation(methylations: &[f64]) -> String {
@@ -99,7 +105,13 @@ impl Windows {
     }
 
     pub fn distribution(&self) -> Vec<i32> {
-        self.combined().iter().map(|w| w.len() as i32).collect()
+        let mut u: Vec<i32> = self.upstream.iter().map(|w| w.len() as i32).collect();
+        let mut g: Vec<i32> = self.gene.iter().map(|w| w.len() as i32).collect();
+        let mut d: Vec<i32> = self.downstream.iter().map(|w| w.len() as i32).collect();
+
+        g.append(&mut d);
+        u.append(&mut g);
+        u
     }
 
     pub fn print_distribution(distribution: &[i32]) -> String {
@@ -160,7 +172,7 @@ pub fn extract_windows(
     for (i, line_result) in lines.enumerate().skip(1) {
         // skip header row
         if let Ok(line) = line_result {
-            if i % 1_000_000 == 0 {
+            if i % 100_000 == 0 {
                 println!("Done with methylation site {i} ");
             }
 
