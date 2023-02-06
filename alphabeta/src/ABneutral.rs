@@ -64,7 +64,7 @@ pub fn run(
         //     / ((m.alpha + m.beta) * ((m.alpha + m.beta - 1.0).powi(2) - 2.0));
         // let predicted_uu = (m.beta * ((1.0 - m.beta).powi(2) - (1.0 - m.alpha).powi(2) - 1.0))
         //     / ((m.alpha + m.beta) * ((m.alpha + m.beta - 1.0).powi(2) - 2.0));
-
+        // dbg!(&m);
         results.lock().unwrap().push(m);
         let c = counter.fetch_add(1, Ordering::SeqCst);
         println!("Progress: {}%", ((c * 100) as f32 / (n_starts) as f32));

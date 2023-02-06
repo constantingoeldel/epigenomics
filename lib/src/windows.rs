@@ -93,7 +93,7 @@ impl Windows {
     pub fn print_steady_state_methylation(methylations: &[f64]) -> String {
         let mut output = String::new();
         for (i, average) in methylations.iter().enumerate() {
-            output.push_str(&format!("{};{}\n", i, average));
+            output.push_str(&format!("{i};{average}\n"));
         }
         output
     }
@@ -107,7 +107,7 @@ impl Windows {
         let mut output = String::new();
 
         for (i, count) in distribution.iter().enumerate() {
-            output.push_str(&format!("{};{}\n", i, count));
+            output.push_str(&format!("{i};{count}\n"));
         }
 
         output

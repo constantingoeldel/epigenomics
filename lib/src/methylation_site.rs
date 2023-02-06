@@ -14,9 +14,35 @@ pub struct MethylationSite {
     pub count_methylated: u32,
     pub count_total: u32,
     pub posteriormax: f64,
-    pub status: char,
+    pub status: MethylationStatus,
     pub meth_lvl: f64,
     pub context_trinucleotide: String,
+}
+/// The three different kinds of methylations statusses that are distinguished in the AlphaBeta paper.
+///
+/// U: unmethylated on both alleles
+/// M: methylated on both alleles
+/// I: methylated on one allele, unmethylated on the other (intermediate)
+#[derive(Clone, PartialEq, Debug)]
+pub enum MethylationStatus {
+    U,
+    M,
+    I,
+}
+
+impl From<char> for MethylationStatus {
+    fn from(c: char) -> Self {
+        match c {
+            'M' => MethylationStatus::M,
+            'I' => MethylationStatus::I,
+            _ => {
+                println!(
+                    "Warning: Encountered invalid methylation status: {c}. Parsed as Unmethylated"
+                );
+                MethylationStatus::U
+            }
+        }
+    }
 }
 
 impl MethylationSite {
@@ -30,7 +56,7 @@ impl MethylationSite {
             count_methylated: 20,
             count_total: 30,
             posteriormax: 0.999,
-            status: 'M',
+            status: MethylationStatus::M,
             meth_lvl: 0.222,
             context_trinucleotide: String::new(),
         }
@@ -40,11 +66,11 @@ impl MethylationSite {
     /// u/u => 0
     /// u/m => 1
     /// m/m => 2
-    pub fn status_numeric(&self) -> u8 {
+    pub fn status_numeric(&self) -> u32 {
         match self.status {
-            'M' => 2,
-            'U' => 0,
-            _ => 1,
+            MethylationStatus::M => 2,
+            MethylationStatus::U => 0,
+            MethylationStatus::I => 1,
         }
     }
 
@@ -87,7 +113,8 @@ impl MethylationSite {
                         status: status
                             .chars()
                             .next()
-                            .ok_or(Error::Simple("Status could not be parsed"))?,
+                            .ok_or(Error::Simple("Status could not included in file"))?
+                            .into(),
                         meth_lvl: meth_lvl.parse::<f64>()?,
                         context_trinucleotide: String::from("XXX"),
                     })
@@ -129,7 +156,8 @@ impl MethylationSite {
                         status: status
                             .chars()
                             .next()
-                            .ok_or(Error::Simple("Status could not be parsed"))?,
+                            .ok_or(Error::Simple("Status could not be parsed"))?
+                            .into(),
                         meth_lvl: meth_lvl.parse::<f64>()?,
                         context_trinucleotide: String::from(trinucleotide),
                     })
@@ -159,7 +187,7 @@ impl MethylationSite {
                         meth_lvl: 0.0,
                         original: s.to_owned(),
                         posteriormax: 0.0,
-                        status: 'X',
+                        status: MethylationStatus::U,
                     })
                 });
 
@@ -205,7 +233,8 @@ impl MethylationSite {
                         status: status
                             .chars()
                             .next()
-                            .ok_or(Error::Simple("Status could not be parsed"))?,
+                            .ok_or(Error::Simple("Status could not be parsed"))?
+                            .into(),
                         meth_lvl: meth_lvl.parse::<f64>()?,
                         context_trinucleotide: String::from("XXX"),
                     })
@@ -230,8 +259,8 @@ impl MethylationSite {
     ///
     /// The lifetime of the genome is longer than the lifetime of the CG site.
     /// GG sites exist only while a single methylation file is being processed but the genome is loaded once and exists for the entire program
-    pub fn find_gene<'short, 'long>(
-        &'short self,
+    pub fn find_gene<'long>(
+        &self,
         genome: &'long [GenesByStrand],
         cutoff: u32,
     ) -> Option<&'long Gene> {
@@ -479,10 +508,10 @@ mod tests {
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
 
-            println!("Placing {}", i);
-            println!("Upstream: {:?}", upstream);
-            println!("Gene: {:?}", gene);
-            println!("Downstream: {:?}", downstream);
+            println!("Placing {i}");
+            println!("Upstream: {upstream:?}");
+            println!("Gene: {gene:?}");
+            println!("Downstream: {downstream:?}");
             assert!(windows.upstream[i as usize].contains(&cg));
             assert!(windows.gene[i as usize].contains(&cg));
             assert!(windows.downstream[i as usize].contains(&cg));
@@ -544,10 +573,10 @@ mod tests {
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
 
-            println!("Placing {}", i);
-            println!("Upstream: {:?}", upstream);
-            println!("Gene: {:?}", gene);
-            println!("Downstream: {:?}", downstream);
+            println!("Placing {i}");
+            println!("Upstream: {upstream:?}");
+            println!("Gene: {gene:?}");
+            println!("Downstream: {downstream:?}");
             assert!(windows.upstream[i as usize].contains(&cg));
             assert!(windows.gene[i as usize].contains(&cg));
             assert!(windows.downstream[i as usize].contains(&cg));
@@ -601,10 +630,10 @@ mod tests {
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
 
-            println!("Placing {}", i);
-            println!("Upstream: {:?}", upstream);
-            println!("Gene: {:?}", gene);
-            println!("Downstream: {:?}", downstream);
+            println!("Placing {i}");
+            println!("Upstream: {upstream:?}");
+            println!("Gene: {gene:?}");
+            println!("Downstream: {downstream:?}");
             println!("{}: {}", i / 10, windows.upstream[(i / 10) as usize].len());
             assert!(windows.upstream[(i / 10) as usize].contains(&cg));
             assert!(windows.gene[(i / 10) as usize].contains(&cg));
@@ -656,7 +685,7 @@ mod tests {
         cg_g.place_in_windows(&gene, &mut windows, &args);
         cg_h.place_in_windows(&gene, &mut windows, &args);
 
-        println!("{}", windows);
+        println!("{windows}");
         assert!(windows.upstream[98].contains(&cg_a));
         assert!(windows.upstream[99].contains(&cg_a));
         assert!(windows.gene[0].contains(&cg_b));
@@ -771,10 +800,10 @@ mod tests {
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
 
-            println!("Placing {}", i);
-            println!("Upstream: {:?}", upstream);
-            println!("Gene: {:?}", gene);
-            println!("Downstream: {:?}", downstream);
+            println!("Placing {i}");
+            println!("Upstream: {upstream:?}");
+            println!("Gene: {gene:?}");
+            println!("Downstream: {downstream:?}");
             println!(
                 "{}: {}",
                 (999 - i) / 10,
@@ -833,10 +862,10 @@ mod tests {
             let gene = cg.place_in_windows(&all_within_gene, &mut windows, &args);
             let downstream = cg.place_in_windows(&all_downstream_gene, &mut windows, &args);
 
-            println!("Placing {}", i);
-            println!("Upstream: {:?}", upstream);
-            println!("Gene: {:?}", gene);
-            println!("Downstream: {:?}", downstream);
+            println!("Placing {i}");
+            println!("Upstream: {upstream:?}");
+            println!("Gene: {gene:?}");
+            println!("Downstream: {downstream:?}");
             println!("{}: {}", (i), windows.upstream[(i) as usize].len());
             assert!(windows.upstream[(i) as usize].contains(&cg));
             assert!(windows.gene[(i) as usize].contains(&cg));

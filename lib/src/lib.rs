@@ -95,7 +95,7 @@ pub fn extract(args: Args) -> Result<()> {
                 max_gene_length = length
             }
         }
-        println!("The maximum gene length is {} bp", max_gene_length);
+        println!("The maximum gene length is {max_gene_length} bp");
     }
 
     set_up_output_dir(args.clone(), max_gene_length)?;
@@ -108,7 +108,7 @@ pub fn extract(args: Args) -> Result<()> {
         |genome, (path, filename)| -> Result<()> {
             let file = open_file(path, filename)?;
             let mut windows =
-                extract_windows(file, genome.to_vec(), max_gene_length as u32, args.clone())?;
+                extract_windows(file, genome.to_vec(), max_gene_length, args.clone())?;
             if args.invert {
                 windows = windows.inverse();
             }

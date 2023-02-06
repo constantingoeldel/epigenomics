@@ -1,14 +1,11 @@
 use rayon::prelude::*;
-use std::{
-    ops::Div,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Mutex,
-    },
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Mutex,
 };
 
 use argmin::{core::Executor, solver::neldermead::NelderMead};
-use ndarray::{array, Array2, Axis};
+use ndarray::{array, Array1, Array2, Axis};
 
 use crate::*;
 
@@ -26,7 +23,7 @@ pub fn run(
     assert_eq!(p0mm + p0uu + p0um, 1.0);
 
     // Alpha, Beta, Weight, Intercept, pr_mm, pr_um, pr_uu
-    let results = Mutex::new(Array2::zeros((n_boot as usize, 7)));
+    let results = Mutex::new(Array2::<f64>::zeros((0, 7)));
     let counter = AtomicU32::new(0);
     // Optimization loop
     (0..n_boot).into_par_iter().for_each(|_i| {
@@ -61,9 +58,7 @@ pub fn run(
         let pr_mm = m.est_mm();
         let pr_um = m.est_um();
         let pr_uu = m.est_uu();
-
         let r = array![m.alpha, m.beta, m.weight, m.intercept, pr_mm, pr_um, pr_uu];
-
         results
             .lock()
             .unwrap()
@@ -77,7 +72,12 @@ pub fn run(
     let sd_alpha = results.column(0).std(1.0);
     let sd_beta = results.column(1).std(1.0);
     // Alpha - Beta
-    let sd_alpha_beta = results.column(1).div(&results.column(0)).std(1.0);
+    let sd_alpha_beta = results
+        .column(1)
+        .iter()
+        .zip(results.column(0).iter())
+        .map(|(b, a)| b / a)
+        .collect::<Array1<f64>>();
 
     let sd_weight = results.column(2).std(1.0);
     let sd_intercept = results.column(3).std(1.0);
@@ -91,7 +91,7 @@ pub fn run(
     Ok(StandardDeviations {
         alpha: sd_alpha,
         beta: sd_beta,
-        alpha_beta: sd_alpha_beta,
+        alpha_beta: sd_alpha_beta.std(1.0),
         weight: sd_weight,
         intercept: sd_intercept,
         p_mm: sd_pr_mm_inf,

@@ -5,6 +5,6 @@ fn main() {
     let args = Args::parse();
     match extract(args) {
         Ok(_) => println!("Done!"),
-        Err(e) => println!("Error: {}", e),
+        Err(e) => println!("Error: {e}"),
     }
 }

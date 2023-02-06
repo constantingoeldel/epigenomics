@@ -17,10 +17,13 @@ pub struct Args {
 
     #[arg(long, short, default_value_t = 0.99)]
     pub posterior_max_filter: f64,
+
+    #[arg(long, short)]
+    pub output: std::path::PathBuf,
 }
 
 fn main() {
-    let args = Args::parse();
+    let mut args = Args::parse();
 
     let (pedigree, p0uu) =
         Pedigree::build(&args.nodelist, &args.edgelist, args.posterior_max_filter)
@@ -31,12 +34,11 @@ fn main() {
     let result = BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, args.iterations)
         .expect("Bootstrap failed");
 
-    model.to_file("./data/model_wt.txt", &result);
-
     println!("##########");
-    println!("Results");
+    println!("Results:\n");
     println!("{model}");
-    println!("##########");
-    println!("Bootstrap");
     println!("{result}");
+    println!("##########");
+    args.output.push("results.txt");
+    model.to_file(args.output.to_str().unwrap(), &result);
 }

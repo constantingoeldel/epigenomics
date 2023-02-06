@@ -1,8 +1,4 @@
-use std::{
-    fmt::{format, Display},
-    fs::File,
-    io::Write,
-};
+use std::{fmt::Display, fs::File, io::Write};
 
 use argmin::core::CostFunction;
 use ndarray::Array1;
@@ -94,11 +90,12 @@ impl Model {
     /// Returns a new model with parameters that are randomly varied by up to 5% of their original value.
     pub fn vary(&self) -> Self {
         let mut rng = thread_rng();
+        const VARIANCE: f64 = 0.5; // 5% variance, somewhat arbitrarily chosen, but even 0.5 does not have a huge effect on the results.
         Model::from_vec(
             &self
                 .to_vec()
                 .iter()
-                .map(|s| rng.sample(Uniform::new(s - s.abs() * 0.05, s + s.abs() * 0.05)))
+                .map(|s| rng.sample(Uniform::new(s - s.abs() * VARIANCE, s + s.abs() * VARIANCE)))
                 .collect::<Vec<f64>>(),
         )
     }

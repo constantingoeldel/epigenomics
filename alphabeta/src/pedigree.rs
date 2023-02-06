@@ -8,7 +8,7 @@ use std::{
 use anyhow::{anyhow, Error};
 use petgraph::{algo::astar, prelude::UnGraph};
 
-use lib::methylation_site::MethylationSite;
+use lib::{methylation_site::MethylationSite, MethylationStatus};
 use ndarray::{array, Array2, ArrayView, Axis};
 #[derive(Clone, Debug)]
 struct Node {
@@ -159,20 +159,33 @@ impl Pedigree {
                 }
 
                 let methylation = methylation.unwrap();
-
                 sites.push(methylation);
             }
-            dbg!(sites.len());
-            let p_uu = sites.iter().filter(|s| s.status == 'U').count() as f64 / sites.len() as f64;
-            let avg_meth_lvl = sites.iter().map(|s| s.meth_lvl).sum::<f64>() / sites.len() as f64;
 
-            node.proportion_unmethylated = Some(p_uu);
+            let valid_sites: Vec<&MethylationSite> = sites
+                .iter()
+                .filter(|s| s.posteriormax >= posterior_max_filter)
+                .collect();
+
+            let p_uu_count = valid_sites
+                .iter()
+                .filter(|s| s.status == MethylationStatus::U)
+                .count();
+
+            let p_uu_share = p_uu_count as f64 / valid_sites.len() as f64;
+
+            dbg!(p_uu_share);
+
+            let avg_meth_lvl =
+                valid_sites.iter().map(|s| s.meth_lvl).sum::<f64>() / valid_sites.len() as f64;
+
+            node.proportion_unmethylated = Some(p_uu_share);
             node.rc_meth_lvl = Some(avg_meth_lvl);
             node.sites = Some(sites);
         }
         let tmp0uu: f64 = nodes
             .iter()
-            .map(|n| n.rc_meth_lvl.unwrap_or(0.0))
+            .map(|n| n.proportion_unmethylated.unwrap_or(0.0))
             .sum::<f64>()
             / nodes.len() as f64;
 
@@ -198,6 +211,10 @@ impl DMatrix {
     fn from(nodes: &Vec<Node>, posterior_max: f64) -> Self {
         let mut divergences = Array2::<f64>::zeros((nodes.len(), nodes.len()));
 
+        let number_of_pairs: u128 = (1..=nodes.len() as u128).product::<u128>()
+            / (2 * (1..=(nodes.len() - 2) as u128).product::<u128>()); // n choose 2 => n! / (2 * (n-2)!)
+
+        let mut count = 0;
         // Go over all pairs of nodes, excluding self-pairs
         for (i, first) in nodes.iter().enumerate() {
             for (j, second) in nodes.iter().skip(i + 1).enumerate() {
@@ -205,8 +222,8 @@ impl DMatrix {
                     "Reading sample: {} and {} ({} of {} pairs) ",
                     first.name,
                     second.name,
-                    i * nodes.len() + j,
-                    nodes.len() * (nodes.len() + 1) / 2 // Gauss sum for n(n+1)/2
+                    count + 1,
+                    number_of_pairs
                 );
 
                 assert!(first.sites.as_ref().is_some());
@@ -216,7 +233,8 @@ impl DMatrix {
                     second.sites.as_ref().unwrap().len()
                 );
 
-                let mut divergence: u8 = 0;
+                let mut divergence = 0;
+                let mut compared_sites = 0;
 
                 // Go over all sites in the first sample
                 // IMPORTANT: It is assumed that the same sites are included in the datasets and that the sites are sorted by position
@@ -233,11 +251,13 @@ impl DMatrix {
                     }
 
                     divergence += f.status_numeric().abs_diff(s.status_numeric());
+                    compared_sites += 1;
                 }
 
-                let divergence = divergence as f64 / first.sites.as_ref().unwrap().len() as f64;
+                let divergence = divergence as f64 / (2.0 * compared_sites as f64);
                 divergences[[i, j]] = divergence;
                 println!("Done! Divergence: {divergence}");
+                count += 1;
             }
         }
         DMatrix(divergences)
@@ -335,7 +355,7 @@ mod tests {
 
         assert_eq!(pedigree.0.shape(), &[4 * 3 / 2, 4]);
         pedigree.0.to_file("./data/pedigree_generated.txt");
-        assert_close!(pedigree.1, 0.527279);
+        assert_close!(pedigree.1, 0.4567024);
     }
 
     #[test]

@@ -9,7 +9,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let p_mm = black_box(0.5);
     let model = black_box(Model::default());
 
-    let pedigree = black_box(Pedigree::from_file("./data/data/pedigree.txt"));
+    let pedigree = black_box(Pedigree::from_file("./data/pedigree.txt"));
     let sv_gzero = array![p_uu, (model.weight) * p_mm, (1.0 - model.weight) * p_mm];
     let p = pedigree.row(0);
 
