@@ -1,5 +1,3 @@
-use core::time;
-
 use clap::Parser;
 
 /// simple tool to separate a methylome by position within a gene

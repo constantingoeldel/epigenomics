@@ -208,10 +208,10 @@ impl DMatrix {
     fn from(nodes: &Vec<Node>, posterior_max: f64) -> Self {
         let mut divergences = Array2::<f64>::zeros((nodes.len(), nodes.len()));
 
-        let number_of_pairs: u128 = (1..=nodes.len() as u128).product::<u128>()
-            / (2 * (1..=(nodes.len() - 2) as u128).product::<u128>()); // n choose 2 => n! / (2 * (n-2)!)
+        // let number_of_pairs: u128 = (1..=nodes.len() as u128).product::<u128>()
+        //     / (2 * (1..=(nodes.len() - 2) as u128).product::<u128>()); // n choose 2 => n! / (2 * (n-2)!)
 
-        let mut count = 0;
+        // let mut count = 0;
         // Go over all pairs of nodes, excluding self-pairs
         for (i, first) in nodes.iter().enumerate() {
             for (j, second) in nodes.iter().skip(i + 1).enumerate() {
@@ -254,7 +254,7 @@ impl DMatrix {
                 let divergence = divergence as f64 / (2.0 * compared_sites as f64);
                 divergences[[i, j]] = divergence;
                 //   println!("Done! Divergence: {divergence}");
-                count += 1;
+                // count += 1;
             }
         }
         DMatrix(divergences)

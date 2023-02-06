@@ -1,6 +1,5 @@
 use alphabeta::*;
 use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]

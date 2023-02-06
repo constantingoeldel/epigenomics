@@ -1,14 +1,9 @@
-use std::{
-    fmt::{format, Write},
-    path::Path,
-    time::Duration,
-};
+use std::{fmt::Write, path::Path, time::Duration};
 
 use clap::Parser;
 use db::import_results;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use lib::{arguments::Args, structs::Region, *};
-use tokio::time::Interval;
 
 #[tokio::main]
 async fn main() {
@@ -16,7 +11,7 @@ async fn main() {
     println!("Starting run {}", args.name);
     match extract(args.clone()) {
         Err(e) => println!("Error: {e}"),
-        Ok(max_gene_length, distribution) => {
+        Ok((max_gene_length, distribution)) => {
             if args.alphabeta {
                 let regions = vec![
                     (Region::Gene, max_gene_length),
@@ -84,12 +79,14 @@ async fn main() {
                     (alpha * ((1.0 - alpha).powi(2) - (1.0 - beta).powi(2) - 1.0))
                         / ((alpha + beta) * ((alpha + beta - 1.0).powi(2) - 2.0))
                 };
-                for (i, (model, sd, region)) in results.iter().enumerate() {
+                for (i, ((model, sd, region), d)) in
+                    results.iter().zip(distribution.iter()).enumerate()
+                {
                     print += &format!(
                         "{};{};{};{};{};{};{};{};{};{}",
                         args.name,
                         i,
-                        distribution
+                        d,
                         region,
                         model.alpha,
                         model.beta,
