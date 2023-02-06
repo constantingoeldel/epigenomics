@@ -5,7 +5,7 @@ use clap::Parser;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     #[arg(short, long, default_value_t = 1000)]
-    pub iterations: u32,
+    pub iterations: u64,
 
     /// Provide an edgefile
     #[arg(long, short)]

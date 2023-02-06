@@ -20,7 +20,7 @@ pub fn run(
     nodelist: &Path,
     edgelist: &Path,
     posterior_max_filter: f64,
-    iterations: u32,
+    iterations: u64,
     output: String,
 ) -> Result<(Model, StandardDeviations), Error> {
     let (pedigree, p0uu) = Pedigree::build(nodelist, edgelist, posterior_max_filter)
@@ -37,7 +37,7 @@ pub fn run(
     println!("{model}");
     println!("{result}");
     println!("##########");
-    model.to_file(&format!("{output}/pedigree.txt"), &result)?;
+    model.to_file(&format!("{output}/model.txt"), &result)?;
     Ok((model, result))
 }
 

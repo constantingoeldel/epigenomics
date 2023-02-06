@@ -27,6 +27,7 @@ lib = { path = "../lib" }
 petgraph = "0.6.2"
 anyhow = "1.0.68"
 clap = "4.1.4"
+indicatif = "0.17.3"
 
 
 [dev-dependencies]

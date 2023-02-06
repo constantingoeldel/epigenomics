@@ -1,3 +1,4 @@
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
@@ -15,7 +16,7 @@ pub fn run(
     p0uu: f64,
     eqp: f64,
     eqp_weight: f64,
-    n_boot: u32,
+    n_boot: u64,
 ) -> Result<StandardDeviations, Box<dyn std::error::Error>> {
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
@@ -24,7 +25,16 @@ pub fn run(
 
     // Alpha, Beta, Weight, Intercept, pr_mm, pr_um, pr_uu
     let results = Mutex::new(Array2::<f64>::zeros((0, 7)));
-    let counter = AtomicU32::new(0);
+    // let counter = AtomicU32::new(0);
+    let pb = ProgressBar::new(n_boot);
+    pb.set_message("BootModel");
+    pb.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {wide_bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap(),
+    );
+
     // Optimization loop
     (0..n_boot).into_par_iter().for_each(|_i| {
         let problem = Problem {
@@ -64,7 +74,8 @@ pub fn run(
             .unwrap()
             .push(Axis(0), r.view())
             .expect("Insertion failed");
-        let c = counter.fetch_add(1, Ordering::Relaxed);
+        // let c = counter.fetch_add(1, Ordering::Relaxed);
+        pb.inc(1);
         //  println!("Progress: {}%", ((c * 100) as f32 / (n_boot) as f32));
     });
     let results = results.into_inner().unwrap();

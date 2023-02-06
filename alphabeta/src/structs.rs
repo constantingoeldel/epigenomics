@@ -38,7 +38,7 @@ impl Display for Model {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Model:\t Alpha: {}\tBeta: {}\tWeight: {}\tIntercept: {}",
+            "Model:\n\tAlpha: {}\n\tBeta: {}\n\tWeight: {}\n\tIntercept: {}",
             self.alpha, self.beta, self.weight, self.intercept
         )
     }
@@ -48,7 +48,7 @@ impl Display for StandardDeviations {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Standard Deviations:\t Alpha: {}\tBeta: {}\tBeta/Alpha: {}\tWeight: {}\tIntercept: {}\tPr_mm: {}\tPr_um: {}\tPr_uu: {}",
+            "Standard Deviations:\n\tAlpha: {}\n\tBeta: {}\n\tBeta/Alpha: {}\n\tWeight: {}\n\tIntercept: {}\nPr_mm: {}\nPr_um: {}\nPr_uu: {}",
             self.alpha,
             self.beta,
             self.alpha_beta,

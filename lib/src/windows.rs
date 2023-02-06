@@ -4,6 +4,7 @@ use std::{
     io::{self, BufRead, Write},
 };
 
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 
 use crate::*;
@@ -163,18 +164,34 @@ pub fn extract_windows(
     genome: Vec<GenesByStrand>,
     max_gene_length: u32,
     args: Args,
+    filename: String,
+    bars: &MultiProgress,
 ) -> Result<Windows> {
     let mut last_gene: Option<&Gene> = None;
 
     let mut windows = Windows::new(max_gene_length, &args);
 
+    const BYTES_PER_LINE: u64 = 34113682 / 950045; // Taken from a random sample, used to estimate number of lines without actually counting
+    let sty = ProgressStyle::with_template(
+        "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+    )
+    .unwrap()
+    .progress_chars("##-");
+    let n_lines = methylome_file.metadata().unwrap().len() / BYTES_PER_LINE;
+
+    let pb = bars.add(ProgressBar::new(n_lines));
+    pb.set_style(sty);
+    pb.set_message(filename);
+
     let lines = io::BufReader::new(methylome_file).lines();
+
     for (i, line_result) in lines.enumerate().skip(1) {
         // skip header row
+        pb.inc(1);
         if let Ok(line) = line_result {
-            if i % 100_000 == 0 {
-                println!("Done with methylation site {i} ");
-            }
+            // if i % 100_000 == 0 {
+            //     println!("Done with methylation site {i} ");
+            // }
 
             // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
             let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};

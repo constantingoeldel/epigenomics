@@ -173,8 +173,6 @@ impl Pedigree {
 
             let p_uu_share = p_uu_count as f64 / valid_sites.len() as f64;
 
-            dbg!(p_uu_share);
-
             let avg_meth_lvl =
                 valid_sites.iter().map(|s| s.meth_lvl).sum::<f64>() / valid_sites.len() as f64;
 
@@ -188,7 +186,7 @@ impl Pedigree {
             .sum::<f64>()
             / nodes.len() as f64;
 
-        println!("finalizing pedigree data...");
+        //  println!("finalizing pedigree data...");
 
         let divergence = DMatrix::from(&nodes, posterior_max_filter);
         let pedigree = divergence.convert(&nodes, &edges);
@@ -217,13 +215,13 @@ impl DMatrix {
         // Go over all pairs of nodes, excluding self-pairs
         for (i, first) in nodes.iter().enumerate() {
             for (j, second) in nodes.iter().skip(i + 1).enumerate() {
-                println!(
-                    "Reading sample: {} and {} ({} of {} pairs) ",
-                    first.name,
-                    second.name,
-                    count + 1,
-                    number_of_pairs
-                );
+                // println!(
+                //     "Reading sample: {} and {} ({} of {} pairs) ",
+                //     first.name,
+                //     second.name,
+                //     count + 1,
+                //     number_of_pairs
+                // );
 
                 assert!(first.sites.as_ref().is_some());
                 assert!(second.sites.as_ref().is_some());
@@ -255,7 +253,7 @@ impl DMatrix {
 
                 let divergence = divergence as f64 / (2.0 * compared_sites as f64);
                 divergences[[i, j]] = divergence;
-                println!("Done! Divergence: {divergence}");
+                //   println!("Done! Divergence: {divergence}");
                 count += 1;
             }
         }

@@ -1,6 +1,7 @@
 use crate::{arguments::Args, error::Error};
 
 use files::*;
+use indicatif::MultiProgress;
 pub use methylation_site::*;
 use rayon::prelude::*;
 use setup::set_up_output_dir;
@@ -103,26 +104,32 @@ pub fn extract(args: Args) -> Result<u32> {
     let distributions = Mutex::new(Vec::new());
     let steady_state_methylations = Mutex::new(Vec::new());
 
+    let bars = MultiProgress::new();
+
     methylome_files.par_iter().try_for_each_with(
         structured_genes,
         |genome, (path, filename)| -> Result<()> {
             let file = open_file(path, filename)?;
-            let mut windows =
-                extract_windows(file, genome.to_vec(), max_gene_length, args.clone())?;
+            let mut windows = extract_windows(
+                file,
+                genome.to_vec(),
+                max_gene_length,
+                args.clone(),
+                filename.to_str().unwrap().to_string(),
+                &bars,
+            )?;
             if args.invert {
                 windows = windows.inverse();
             }
             windows.save(&args, filename)?;
             let distribution = windows.distribution();
-            {
-                println!("GIt here");
-                distributions.lock().unwrap().push(distribution);
-                println!("end here");
-            }
+
+            distributions.lock().unwrap().push(distribution);
+
             let methylation = windows.steady_state_methylation();
-            {
-                steady_state_methylations.lock().unwrap().push(methylation);
-            }
+
+            steady_state_methylations.lock().unwrap().push(methylation);
+
             Ok(())
         },
     )?;

@@ -5,6 +5,7 @@ use std::sync::{
 
 use crate::*;
 use argmin::{core::Executor, solver::neldermead::NelderMead};
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 pub fn run(
@@ -12,7 +13,7 @@ pub fn run(
     p0uu: f64,
     eqp: f64,
     eqp_weight: f64,
-    n_starts: u32,
+    n_starts: u64,
 ) -> Result<Model, Box<dyn std::error::Error>> {
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
@@ -25,7 +26,15 @@ pub fn run(
     assert_eq!(p0mm + p0uu + p0um, 1.0);
 
     let results: Mutex<Vec<Model>> = Mutex::new(Vec::new());
-    let counter = AtomicU32::new(0);
+    // let counter = AtomicU32::new(0);
+    let pb = ProgressBar::new(n_starts);
+    pb.set_message("ABNeutral");
+    pb.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {wide_bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap(),
+    );
     // Optimization loop
     (0..n_starts).into_par_iter().for_each(|_| {
         // Draw random starting values
@@ -66,7 +75,8 @@ pub fn run(
         //     / ((m.alpha + m.beta) * ((m.alpha + m.beta - 1.0).powi(2) - 2.0));
         // dbg!(&m);
         results.lock().unwrap().push(m);
-        let c = counter.fetch_add(1, Ordering::SeqCst);
+        // let c = counter.fetch_add(1, Ordering::SeqCst);
+        pb.inc(1);
         //  println!("Progress: {}%", ((c * 100) as f32 / (n_starts) as f32));
     });
     let mut results = results.into_inner().unwrap();
@@ -95,10 +105,7 @@ pub fn run(
     // Caution: Calculating predicted divergence based on lowest LSQ model: check the biology!", "\n")
 
     let best: &Model = &results[0];
-    println!(
-        "Done with optimizing: Best model {}, {}, {}, {}",
-        best.alpha, best.beta, best.weight, best.intercept
-    );
+
     let divergence = divergence(
         pedigree,
         p0mm,
