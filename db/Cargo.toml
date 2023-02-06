@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 lib = { path = "../lib" }
+alphabeta = {path = "../alphabeta"}
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres" ] }
 
 

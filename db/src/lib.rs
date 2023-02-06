@@ -1,7 +1,8 @@
+use alphabeta::{Model, StandardDeviations};
 use lib::{
     files::lines_from_file,
     methylation_site::MethylationSite,
-    structs::{Gene, Result, Strand},
+    structs::{Gene, Region, Result, Strand},
 };
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::env;
@@ -115,6 +116,30 @@ pub async fn import_sites(
             }
         }
     }
-    println!("{rows_affected} annotations were anned to the database!");
+    println!("{rows_affected} annotations were added to the database!");
+    Ok(())
+}
+
+pub async fn import_results(
+    db: &Pool<Postgres>,
+    name: String,
+    results: Vec<(Model, StandardDeviations, Region)>,
+) -> Result<()> {
+    let mut rows_affected = 0;
+
+    for (i, result) in results.iter().enumerate() {
+        rows_affected += sqlx::query!(
+            r#"INSERT INTO results (alpha, beta, alpha_error, beta_error, region, run, "window") VALUES($1,$2,$3,$4,$5,$6, $7)"#,
+            result.0.alpha,
+            result.0.beta,
+            result.1.alpha,
+            result.1.beta,
+            result.2.clone() as Region,
+            name,
+            i as i32
+        ).execute(db).await?.rows_affected();
+    }
+    println!("{rows_affected} results were added to the database!");
+
     Ok(())
 }

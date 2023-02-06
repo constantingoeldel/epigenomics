@@ -1,11 +1,8 @@
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Mutex,
-};
+use std::sync::Mutex;
 
 use crate::*;
 use argmin::{core::Executor, solver::neldermead::NelderMead};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use rayon::prelude::*;
 
 pub fn run(
@@ -14,7 +11,10 @@ pub fn run(
     eqp: f64,
     eqp_weight: f64,
     n_starts: u64,
+    pb: Option<ProgressBar>,
 ) -> Result<Model, Box<dyn std::error::Error>> {
+    let pb = pb.unwrap_or_else(move || Progress::new("ABneutral", n_starts).0);
+
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
     let max_divergence = *pedigree
@@ -27,14 +27,7 @@ pub fn run(
 
     let results: Mutex<Vec<Model>> = Mutex::new(Vec::new());
     // let counter = AtomicU32::new(0);
-    let pb = ProgressBar::new(n_starts);
-    pb.set_message("ABNeutral");
-    pb.set_style(
-        ProgressStyle::with_template(
-            "[{elapsed_precise}] {wide_bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
-        )
-        .unwrap(),
-    );
+
     // Optimization loop
     (0..n_starts).into_par_iter().for_each(|_| {
         // Draw random starting values
@@ -79,6 +72,8 @@ pub fn run(
         pb.inc(1);
         //  println!("Progress: {}%", ((c * 100) as f32 / (n_starts) as f32));
     });
+    pb.finish();
+
     let mut results = results.into_inner().unwrap();
     // Calculating the least squares error for all results and selecting the best one
     results.sort_by(|a, b| {

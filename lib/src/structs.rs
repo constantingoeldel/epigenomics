@@ -17,11 +17,22 @@ pub enum Strand {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, sqlx::Type)]
+#[sqlx(type_name = "region")]
 pub enum Region {
     Upstream,
     Gene,
     Downstream,
+}
+
+impl Display for Region {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Upstream => write!(f, "upstream"),
+            Self::Gene => write!(f, "gene"),
+            Self::Downstream => write!(f, "downstream"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

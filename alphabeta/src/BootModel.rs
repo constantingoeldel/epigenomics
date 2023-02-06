@@ -1,9 +1,6 @@
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use rayon::prelude::*;
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Mutex,
-};
+use std::sync::Mutex;
 
 use argmin::{core::Executor, solver::neldermead::NelderMead};
 use ndarray::{array, Array1, Array2, Axis};
@@ -17,7 +14,10 @@ pub fn run(
     eqp: f64,
     eqp_weight: f64,
     n_boot: u64,
+    pb: Option<ProgressBar>,
 ) -> Result<StandardDeviations, Box<dyn std::error::Error>> {
+    let pb = pb.unwrap_or_else(|| Progress::new("BootModel", n_boot).0);
+
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
 
@@ -26,14 +26,6 @@ pub fn run(
     // Alpha, Beta, Weight, Intercept, pr_mm, pr_um, pr_uu
     let results = Mutex::new(Array2::<f64>::zeros((0, 7)));
     // let counter = AtomicU32::new(0);
-    let pb = ProgressBar::new(n_boot);
-    pb.set_message("BootModel");
-    pb.set_style(
-        ProgressStyle::with_template(
-            "[{elapsed_precise}] {wide_bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
-        )
-        .unwrap(),
-    );
 
     // Optimization loop
     (0..n_boot).into_par_iter().for_each(|_i| {
@@ -78,6 +70,8 @@ pub fn run(
         pb.inc(1);
         //  println!("Progress: {}%", ((c * 100) as f32 / (n_boot) as f32));
     });
+    pb.finish();
+
     let results = results.into_inner().unwrap();
     // Standard deviations
     let sd_alpha = results.column(0).std(1.0);

@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs::File, io::Write};
+use std::{fmt::Display, fs::File, io::Write, ops::Deref};
 
 use argmin::core::CostFunction;
 use ndarray::Array1;
@@ -32,6 +32,30 @@ pub struct StandardDeviations {
     pub p_mm: f64,
     pub p_um: f64,
     pub p_uu: f64,
+}
+
+pub struct Progress(pub ProgressBar);
+
+impl Progress {
+    pub fn new(name: &'static str, iterations: u64) -> Self {
+        let pb = ProgressBar::new(iterations);
+
+        pb.set_message(name);
+        pb.set_style(
+            ProgressStyle::with_template(
+                "{msg} [{elapsed}] {wide_bar:40.cyan/blue} {pos:>7}/{len:7}",
+            )
+            .unwrap(),
+        );
+        Progress(pb)
+    }
+}
+
+impl Deref for Progress {
+    type Target = ProgressBar;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl Display for Model {
@@ -75,11 +99,17 @@ impl Default for Model {
 
 impl Model {
     pub fn new(max_divergence: f64) -> Self {
+        let mut max = max_divergence;
+        if max_divergence <= 0.0 {
+            println!("Sample has a maximum divergence of zero! Check your data");
+            max = 0.1;
+        }
+
         let mut rng = thread_rng();
         let alpha = 10.0_f64.powf(rng.sample(Uniform::new(-9.0, -2.0)));
         let beta = 10.0_f64.powf(rng.sample(Uniform::new(-9.0, -2.0)));
         let weight = rng.sample(Uniform::new(0.0, 0.1));
-        let intercept = rng.sample(Uniform::new(0.0, max_divergence));
+        let intercept = rng.sample(Uniform::new(0.0, max));
         Model {
             alpha,
             beta,
@@ -88,14 +118,34 @@ impl Model {
         }
     }
     /// Returns a new model with parameters that are randomly varied by up to 5% of their original value.
+    ///
+    /// I made sure to check that only positive, non-zero floats can be passed, but this is a nicer way to handle errors as the panic is not well-readable
     pub fn vary(&self) -> Self {
         let mut rng = thread_rng();
-        const VARIANCE: f64 = 0.5; // 5% variance, somewhat arbitrarily chosen, but even 0.5 does not have a huge effect on the results.
+        const VARIANCE: f64 = 0.1; // 10% variance, somewhat arbitrarily chosen, but even 0.5 does not have a huge effect on the results.
+
+        fn var(n: f64) -> Uniform<f64> {
+            if n == 0.0 {
+                println!("Warning: One of the parameters you passed was zero");
+                return var(0.1);
+            }
+
+            let low = n - n.abs() * VARIANCE;
+            let high = n + n.abs() * VARIANCE;
+
+            if low >= high {
+                println!("Wrong order: Low >= high ({} >= {})", low, high);
+                Uniform::new(high, low)
+            } else {
+                Uniform::new(low, high)
+            }
+        }
+
         Model::from_vec(
             &self
                 .to_vec()
                 .iter()
-                .map(|s| rng.sample(Uniform::new(s - s.abs() * VARIANCE, s + s.abs() * VARIANCE)))
+                .map(|s| rng.sample(var(*s)))
                 .collect::<Vec<f64>>(),
         )
     }

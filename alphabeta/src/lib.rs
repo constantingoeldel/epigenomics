@@ -10,6 +10,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Error};
 pub use divergence::*;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 pub use macros::*;
 pub use pedigree::*;
 pub use structs::*;
@@ -22,16 +23,49 @@ pub fn run(
     posterior_max_filter: f64,
     iterations: u64,
     output: String,
+    bars: &MultiProgress,
 ) -> Result<(Model, StandardDeviations), Error> {
     let (pedigree, p0uu) = Pedigree::build(nodelist, edgelist, posterior_max_filter)
         .map_err(|e| anyhow!("Error while building pedigree: {}", e))?;
     pedigree.to_file(&format!("{output}/pedigree.txt"))?;
 
-    let model = ABneutral::run(&pedigree, p0uu, p0uu, 1.0, iterations)
-        .map_err(|e| anyhow!("Model failed: {}", e))?;
-    let result = BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, iterations)
-        .map_err(|e| anyhow!("Bootstrap failed: {}", e))?;
+    let pb_neutral = bars.insert(0, ProgressBar::new(iterations));
+    let pb_boot = bars.insert(1, ProgressBar::new(iterations));
 
+    pb_neutral.set_message("ABNeutral");
+    pb_boot.set_message("BootModel");
+    pb_neutral.set_style(
+        ProgressStyle::with_template("{msg} {bar:40.cyan/blue} [{elapsed}] {pos:>7}/{len:7}")
+            .unwrap(),
+    );
+
+    pb_boot.set_style(
+        ProgressStyle::with_template("{msg} {bar:40.cyan/blue} [{elapsed}] {pos:>7}/{len:7}")
+            .unwrap(),
+    );
+    pb_boot.tick();
+
+    let model = ABneutral::run(
+        &pedigree,
+        p0uu,
+        p0uu,
+        1.0,
+        iterations,
+        Some(pb_neutral.clone()),
+    )
+    .map_err(|e| anyhow!("Model failed: {}", e))?;
+    let result = BootModel::run(
+        &pedigree,
+        &model,
+        p0uu,
+        p0uu,
+        1.0,
+        iterations,
+        Some(pb_boot.clone()),
+    )
+    .map_err(|e| anyhow!("Bootstrap failed: {}", e))?;
+    bars.remove(&pb_neutral);
+    bars.remove(&pb_boot);
     println!("##########");
     println!("Results:\n");
     println!("{model}");
@@ -56,9 +90,9 @@ mod tests {
         )
         .expect("Error while building pedigree: ");
 
-        let model = ABneutral::run(&pedigree, p0uu, p0uu, 1.0, 1000).expect("Model failed");
-        let result =
-            BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, 200).expect("Bootstrap failed");
+        let model = ABneutral::run(&pedigree, p0uu, p0uu, 1.0, 1000, None).expect("Model failed");
+        let result = BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, 200, None)
+            .expect("Bootstrap failed");
         println!("{result}");
         assert_close_10_percent!(model.alpha, 5.7985750419976e-05);
         assert_close_10_percent!(model.beta, 0.00655710970515347);

@@ -25,7 +25,7 @@ pub fn set_up_output_dir(args: Args, max_gene_length: u32) -> Result<()> {
         let max = if args.absolute { side.1 } else { 100 };
         let side = side.0;
 
-        for window in (0..=max).step_by(args.window_step as usize) {
+        for window in (0..max).step_by(args.window_step as usize) {
             let mut nodelist = String::new();
             let lines = nodes.split('\n');
             for line in lines {

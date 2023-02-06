@@ -7,5 +7,8 @@ edition = "2021"
 
 [dependencies]
 lib = { path = "../lib" }
+db = {path = "../db"}
 alphabeta = { path = "../alphabeta" }
 clap = { version = "4.0.27", features = ["derive"] }
+tokio = { version = "1.25.0", features =["full"] }
+indicatif = "0.17.3"

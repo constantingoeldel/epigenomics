@@ -90,11 +90,11 @@ impl Pedigree {
         edgelist: &Path,
         posterior_max_filter: f64,
     ) -> Result<(Self, f64), Error> {
-        println!(
-            "Building pedigree from {} and {}",
-            nodelist.display(),
-            edgelist.display()
-        );
+        // println!(
+        //     "Building pedigree from {} and {}",
+        //     nodelist.display(),
+        //     edgelist.display()
+        // );
 
         let nodes = fs::read_to_string(nodelist)?;
         let edges = fs::read_to_string(edgelist)?;

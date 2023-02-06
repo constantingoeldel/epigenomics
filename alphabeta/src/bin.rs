@@ -1,5 +1,6 @@
 use alphabeta::*;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
@@ -30,8 +31,9 @@ fn main() {
             .expect("Error while building pedigree: ");
     pedigree.to_file("./data/pedigree_wt.txt").unwrap();
 
-    let model = ABneutral::run(&pedigree, p0uu, p0uu, 1.0, args.iterations).expect("Model failed");
-    let result = BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, args.iterations)
+    let model =
+        ABneutral::run(&pedigree, p0uu, p0uu, 1.0, args.iterations, None).expect("Model failed");
+    let result = BootModel::run(&pedigree, &model, p0uu, p0uu, 1.0, args.iterations, None)
         .expect("Bootstrap failed");
 
     println!("##########");

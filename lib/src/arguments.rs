@@ -1,3 +1,5 @@
+use core::time;
+
 use clap::Parser;
 
 /// simple tool to separate a methylome by position within a gene
@@ -51,6 +53,10 @@ pub struct Args {
     /// Also run AlphaBeta on every window after extraction, results will be stored in the same directory as the segments
     #[arg(long, default_value_t = false)]
     pub alphabeta: bool,
+
+    /// Name of the run to be used when storing the result in Postgres
+    #[arg(long, default_value_t = format!("{:?}", std::time::Instant::now()))]
+    pub name: String,
 }
 
 // impl Args {

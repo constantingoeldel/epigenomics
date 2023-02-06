@@ -204,6 +204,8 @@ pub fn extract_windows(
             }
         }
     }
+    pb.finish();
+
     Ok(windows)
 }
 
