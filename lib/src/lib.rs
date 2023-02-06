@@ -22,7 +22,7 @@ pub mod setup;
 pub mod structs;
 pub mod windows;
 
-pub fn extract(args: Args) -> Result<u32> {
+pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     let start = std::time::Instant::now();
     let mut args = args;
 
@@ -143,11 +143,9 @@ pub fn extract(args: Args) -> Result<u32> {
 
     let distribution_file = format!("{}/distribution.txt", &args.output_dir);
     let methylation_file = format!("{}/steady_state_methylation.txt", &args.output_dir);
+    let d = distributions.into_inner().unwrap();
 
-    fs::write(
-        distribution_file,
-        Windows::print_distribution(&distributions.lock().unwrap()[0]),
-    )?;
+    fs::write(distribution_file, Windows::print_distribution(&d[0]))?;
     fs::write(
         methylation_file,
         Windows::print_steady_state_methylation(&average_methylation),
@@ -155,5 +153,5 @@ pub fn extract(args: Args) -> Result<u32> {
 
     println!("Done in: {:?}", start.elapsed());
 
-    Ok(max_gene_length)
+    Ok((max_gene_length, d[0].clone()))
 }
