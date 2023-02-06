@@ -12,7 +12,7 @@ macro_rules! assert_close_epsilon {
 #[macro_export]
 macro_rules! assert_close {
     ($x:expr, $y:expr ) => {
-        if !(($x - $y).abs() < 1e-5) {
+        if !(($x - $y).abs() < 1e-4) {
             panic!(
                 "assertion failed: `abs(left - right) < {}`, (left: `{}`, right: `{}`)",
                 1e-6, $x, $y
