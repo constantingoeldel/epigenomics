@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use setup::set_up_output_dir;
 use std::{
     ffi::OsString,
+    fmt::format,
     fs::{self, File},
     io::{self, BufRead},
     path::PathBuf,
@@ -145,7 +146,14 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     let methylation_file = format!("{}/steady_state_methylation.txt", &args.output_dir);
     let all_methylations_file = format!("{}/all_steady_state_methylation.txt", &args.output_dir);
     let d = distributions.into_inner().unwrap();
-    fs::write(distribution_file, Windows::print_distribution(&d[0]))?;
+
+    for (distribution, file) in d.iter().zip(methylome_files.iter().map(|m| &m.1)) {
+        fs::write(
+            format!("{}_{}", &distribution_file, &file.to_string_lossy()),
+            Windows::print_distribution(distribution),
+        )?;
+    }
+
     fs::write(
         methylation_file,
         Windows::print_steady_state_methylation(&average_methylation),

@@ -6,7 +6,7 @@ use crate::error;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-#[derive(Clone, PartialEq, Eq, Debug, sqlx::Type)]
+#[derive(Clone, Debug, sqlx::Type)]
 #[sqlx(type_name = "strandness")]
 pub enum Strand {
     #[sqlx(rename = "+")]
@@ -16,6 +16,18 @@ pub enum Strand {
     #[sqlx(rename = "*")]
     Unknown,
 }
+
+impl PartialEq for Strand {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Sense, Self::Antisense) => false,
+            (Self::Antisense, Self::Sense) => false,
+            _ => true, // If one of them is unknown, they are equal. WARNING: This leads to unexpected behaviour if you want to check for one specific strand! in that case use `if let Strand::X = self.strand {}
+        }
+    }
+}
+
+impl Eq for Strand {}
 
 #[derive(Debug, Clone, sqlx::Type)]
 #[sqlx(type_name = "region")]
@@ -63,6 +75,13 @@ impl GenesByStrand {
             sense: Vec::new(),
             antisense: Vec::new(),
         }
+    }
+
+    pub fn chain(&self) -> Vec<&Gene> {
+        let sense_iter = self.sense.iter();
+        let antisense_iter = self.antisense.iter();
+
+        sense_iter.chain(antisense_iter).collect()
     }
 
     pub fn insert(&mut self, gene: Gene) {

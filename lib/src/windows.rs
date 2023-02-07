@@ -139,8 +139,8 @@ impl Windows {
         // In CSV format
         let mut output = String::new();
 
-        for (i, count) in distribution.iter().enumerate() {
-            output.push_str(&format!("{i};{count}\n"));
+        for (_i, count) in distribution.iter().enumerate() {
+            output.push_str(&format!("{count}\n"));
         }
 
         output
@@ -211,6 +211,7 @@ pub fn extract_windows(
         if let Ok(line) = line_result {
             // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
             let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
+
             if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
                 last_gene = cg.find_gene(&genome, args.cutoff);
             }

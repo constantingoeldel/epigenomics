@@ -307,10 +307,10 @@ impl MethylationSite {
         cutoff: u32,
     ) -> Option<&'long Gene> {
         let chromosome = &genome[(self.chromosome - 1) as usize];
-        let strand = match self.strand {
-            Strand::Sense => &chromosome.sense,
-            Strand::Antisense => &chromosome.antisense,
-            _ => return None, // TODO: Handle unknown strand case
+        let strand: Vec<&Gene> = match self.strand {
+            Strand::Sense => chromosome.sense.iter().collect(), // This is a large performance hit. Is there a better way to do this?
+            Strand::Antisense => chromosome.antisense.iter().collect(),
+            Strand::Unknown => chromosome.chain(),
         };
         let first_matching_gene_index = strand
             .binary_search_by_key(&self.location, |gene| gene.end + cutoff)
@@ -345,6 +345,12 @@ impl MethylationSite {
         let start = gene.start as f64;
         let end = gene.end as f64;
         let length = end - start;
+
+        if let Strand::Unknown = self.strand {
+            let mut copy = self.clone();
+            copy.strand = Strand::Sense;
+            return copy.place_in_windows(gene, windows, args);
+        }
 
         // Offset from start for + strand, offset from end for - strand. Can be negative for upstream sites
         let mut windows_in = Vec::new();
