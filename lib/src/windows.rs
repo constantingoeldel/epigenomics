@@ -99,8 +99,25 @@ impl Windows {
 
     pub fn print_steady_state_methylation(methylations: &[f64]) -> String {
         let mut output = String::new();
-        for (i, average) in methylations.iter().enumerate() {
-            output.push_str(&format!("{i};{average}\n"));
+        for (_i, average) in methylations.iter().enumerate() {
+            output.push_str(&format!("{average}\n"));
+        }
+        output
+    }
+
+    pub fn print_all_steady_state_methylations(
+        nodes: Vec<String>,
+        methylations: Vec<Vec<f64>>,
+    ) -> String {
+        let mut output = String::new();
+        for (_i, (values, node)) in methylations.iter().zip(nodes.iter()).enumerate() {
+            output.push_str(node);
+            output.push(';');
+
+            for value in values {
+                output.push_str(&format!("{value};"));
+            }
+            output.push('\n');
         }
         output
     }
@@ -185,14 +202,10 @@ pub fn extract_windows(
 
     let lines = io::BufReader::new(methylome_file).lines();
 
-    for (i, line_result) in lines.enumerate().skip(1) {
+    for line_result in lines.skip(1) {
         // skip header row
         pb.inc(1);
         if let Ok(line) = line_result {
-            // if i % 100_000 == 0 {
-            //     println!("Done with methylation site {i} ");
-            // }
-
             // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
             let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
             if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {

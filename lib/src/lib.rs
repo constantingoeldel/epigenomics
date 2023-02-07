@@ -143,12 +143,22 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
 
     let distribution_file = format!("{}/distribution.txt", &args.output_dir);
     let methylation_file = format!("{}/steady_state_methylation.txt", &args.output_dir);
+    let all_methylations_file = format!("{}/all_steady_state_methylation.txt", &args.output_dir);
     let d = distributions.into_inner().unwrap();
-
     fs::write(distribution_file, Windows::print_distribution(&d[0]))?;
     fs::write(
         methylation_file,
         Windows::print_steady_state_methylation(&average_methylation),
+    )?;
+    fs::write(
+        all_methylations_file,
+        Windows::print_all_steady_state_methylations(
+            methylome_files
+                .iter()
+                .map(|f| f.1.to_str().unwrap().to_string())
+                .collect(),
+            steady_state_methylations.into_inner().unwrap(),
+        ),
     )?;
 
     println!("Done in: {:?}", start.elapsed());

@@ -1,4 +1,4 @@
-use std::{fmt::Write, path::Path, time::Duration};
+use std::{fmt::Write, fs::write, path::Path, time::Duration};
 
 use clap::Parser;
 use db::import_results;
@@ -14,8 +14,8 @@ async fn main() {
         Ok((max_gene_length, distribution)) => {
             if args.alphabeta {
                 let regions = vec![
-                    (Region::Gene, max_gene_length),
                     (Region::Upstream, args.cutoff),
+                    (Region::Gene, max_gene_length),
                     (Region::Downstream, args.cutoff),
                 ];
                 let mut results = Vec::new();
@@ -61,7 +61,7 @@ async fn main() {
                                 &args.output_dir, &region.0, window
                             )),
                             0.99,
-                            1000,
+                            10,
                             format!("{}/{}/{}/", &args.output_dir, region.0, window),
                             &multi,
                         );
@@ -73,7 +73,7 @@ async fn main() {
                 }
                 pb.finish();
 
-                let mut print = String::from("run;window;cg_count;region;alpha;beta;alpha_error;beta_error;1/2*(alpha+beta);pred_steady_state");
+                let mut print = String::from("run;window;cg_count;region;alpha;beta;alpha_error;beta_error;1/2*(alpha+beta);pred_steady_state\n");
 
                 let steady_state = |alpha: f64, beta: f64| {
                     (alpha * ((1.0 - alpha).powi(2) - (1.0 - beta).powi(2) - 1.0))
@@ -83,7 +83,7 @@ async fn main() {
                     results.iter().zip(distribution.iter()).enumerate()
                 {
                     print += &format!(
-                        "{};{};{};{};{};{};{};{};{};{}",
+                        "{};{};{};{};{};{};{};{};{};{}\n",
                         args.name,
                         i,
                         d,
@@ -97,6 +97,10 @@ async fn main() {
                     )
                 }
 
+                println!("{print}");
+
+                write(args.output_dir + "/results.txt", print)
+                    .expect("Could not save results to file.");
                 let db = db::connect()
                     .await
                     .expect("Could not connect to database: Did you provide a connection string?");

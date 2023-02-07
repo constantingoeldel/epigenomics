@@ -53,7 +53,7 @@ pub fn run(
             .configure(|state| {
                 state
                     // .param(vec![alpha, beta, weight, intercept])
-                    .max_iters(1000)
+                    .max_iters(10000)
             })
             .run()
             .expect("Failed to run Nelder-Mead optimization");
