@@ -22,7 +22,7 @@ float-ord = "0.3.2"
 ndarray = { version = "0.15.0", features = ["blas"] }
 blas-src = { version = "0.8.0",  features = ["openblas"] }
 # blas-src = { version = "0.8", features = ["blis"] }
-openblas-src = { version = "0.10", cache =false, features = ["cblas"] }
+openblas-src = { version = "0.10",  features = ["cblas", "system"] }
 rand = "0.8.5"
 rayon = "1.6.1"
 lib = { path = "../lib" }

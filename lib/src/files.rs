@@ -28,14 +28,6 @@ pub fn load_methylome(methylome: &str) -> Result<Vec<(PathBuf, OsString)>> {
         )
     })?;
     let methylome_files = methylome_dir
-        .filter(|f| {
-            f.as_ref()
-                .unwrap()
-                .file_name()
-                .to_str()
-                .unwrap()
-                .contains(".txt")
-        })
         .map(|f| (f.as_ref().unwrap().path(), f.unwrap().file_name()))
         .collect();
     Ok(methylome_files)

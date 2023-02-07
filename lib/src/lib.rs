@@ -33,7 +33,7 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
 
     let methylome_files = load_methylome(&args.methylome)?;
     let annotation_lines = lines_from_file(&args.genome)?;
-
+    dbg!(methylome_files.len());
     let mut genes: Vec<Gene> = Vec::new();
 
     // Parse annotation file to extract genes

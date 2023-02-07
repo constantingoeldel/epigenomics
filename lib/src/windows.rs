@@ -105,6 +105,9 @@ impl Windows {
         output
     }
 
+    /// Print steady state methylations for all windows for all nodes.
+    ///
+    /// Useful when a single directory containes nodes of several samples.
     pub fn print_all_steady_state_methylations(
         nodes: Vec<String>,
         methylations: Vec<Vec<f64>>,
@@ -234,18 +237,12 @@ impl Display for Windows {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
 
     use crate::arguments::Args;
 
     #[test]
     fn new_absolute() {
         let args = Args {
-            alphabeta: false,
-            edges: PathBuf::new(),
-            nodes: PathBuf::new(),
-            db: false,
-            invert: false,
             methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
             genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
                 .to_string(),
@@ -255,6 +252,7 @@ mod test {
             output_dir: "/home/constantin/windows".to_string(),
             absolute: true,
             cutoff: 2048,
+            ..Default::default()
         };
         let windows = super::Windows::new(4096, &args);
         assert_eq!(windows.upstream.len(), 8);
@@ -264,11 +262,6 @@ mod test {
     #[test]
     fn new_relative() {
         let args = Args {
-            alphabeta: false,
-            db: false,
-            edges: PathBuf::new(),
-            nodes: PathBuf::new(),
-            invert: false,
             methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
             genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
                 .to_string(),
@@ -278,6 +271,7 @@ mod test {
             output_dir: "/home/constantin/windows".to_string(),
             absolute: false,
             cutoff: 2048,
+            ..Default::default()
         };
         let windows = super::Windows::new(4096, &args);
         assert_eq!(windows.upstream.len(), 100);

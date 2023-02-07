@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 
 /// simple tool to separate a methylome by position within a gene
@@ -57,20 +59,22 @@ pub struct Args {
     pub name: String,
 }
 
-// impl Args {
-//     fn default() -> Self {
-//         Args {
-//             db: false,
-//             invert: false,
-//             absolute: false,
-//             cutoff: 2048,
-//             genome: String::from("default"),
-//             methylome: String::from("also default"),
-//             output_dir: String::from("also default"),
-//             window_size: 5,
-//             window_step: 1,
-//             edges: PathBuf::new(),
-//             nodes: PathBuf::new(),
-//         }
-//     }
-// }
+impl Default for Args {
+    fn default() -> Self {
+        Args {
+            db: false,
+            invert: false,
+            absolute: false,
+            cutoff: 2048,
+            genome: String::from("default"),
+            methylome: String::from("also default"),
+            output_dir: String::from("also default"),
+            window_size: 5,
+            window_step: 1,
+            edges: PathBuf::new(),
+            nodes: PathBuf::new(),
+            alphabeta: false,
+            name: String::new(),
+        }
+    }
+}
