@@ -27,6 +27,10 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     let start = std::time::Instant::now();
     let mut args = args;
 
+    if args.alphabeta && (args.nodes.is_none() || args.edges.is_none()) {
+        panic!("You need to specify the nodes and edges file when using the alphabeta method");
+    }
+
     // Adj ust window_step to default value
     if args.window_step == 0 {
         args.window_step = args.window_size;
@@ -34,7 +38,6 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
 
     let methylome_files = load_methylome(&args.methylome)?;
     let annotation_lines = lines_from_file(&args.genome)?;
-    dbg!(methylome_files.len());
     let mut genes: Vec<Gene> = Vec::new();
 
     // Parse annotation file to extract genes
@@ -44,6 +47,10 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
         if let Some(gene) = gene {
             genes.push(gene)
         }
+    }
+
+    if genes.is_empty() {
+        return Err(Error::Simple("Could not parse a single annotation from the annotation file. Please check your input or add a parser implemenation for your data format."));
     }
 
     // number of different chromosomes assuming they are named from 1 to highest
@@ -71,7 +78,7 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
         let strand = match &g.strand {
             Strand::Sense => &mut chromosome.sense,
             Strand::Antisense => &mut chromosome.antisense,
-            _ => return,
+            Strand::Unknown => &mut chromosome.sense, // if strandness is unknown, assume it is on the sense strand. Leads to bugs if genes have unknown strandness but sites are antisense.
         };
         if g.strand == Strand::Sense {
             sense_gene_count += 1;
@@ -81,7 +88,7 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     });
     let average_gene_length = gene_length_sum / genes.len() as u32;
     println!(
-        "Average gene length: {} bp, {} genes, of which {} are on the sense strand and {} on the antisense strand",
+        "Average gene length: {} bp, {} genes, of which {} are on the sense strand and {} on the antisense strand or their strandness is unknown",
         average_gene_length,
         genes.len(),
         sense_gene_count,
@@ -142,17 +149,19 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
         }
     }
 
-    let distribution_file = format!("{}/distribution.txt", &args.output_dir);
+    //  let distribution_file = format!("{}/distribution.txt", &args.output_dir);
     let methylation_file = format!("{}/steady_state_methylation.txt", &args.output_dir);
     let all_methylations_file = format!("{}/all_steady_state_methylation.txt", &args.output_dir);
+    let all_distributions_file = format!("{}/distributions.txt", &args.output_dir);
+
     let d = distributions.into_inner().unwrap();
 
-    for (distribution, file) in d.iter().zip(methylome_files.iter().map(|m| &m.1)) {
-        fs::write(
-            format!("{}_{}", &distribution_file, &file.to_string_lossy()),
-            Windows::print_distribution(distribution),
-        )?;
-    }
+    // for (distribution, file) in d.iter().zip(methylome_files.iter().map(|m| &m.1)) {
+    //     fs::write(
+    //         format!("{}_{}", &distribution_file, &file.to_string_lossy()),
+    //         Windows::print_distribution(distribution),
+    //     )?;
+    // }
 
     fs::write(
         methylation_file,
@@ -166,6 +175,16 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
                 .map(|f| f.1.to_str().unwrap().to_string())
                 .collect(),
             steady_state_methylations.into_inner().unwrap(),
+        ),
+    )?;
+    fs::write(
+        all_distributions_file,
+        Windows::print_all_distributions(
+            methylome_files
+                .iter()
+                .map(|f| f.1.to_str().unwrap().to_string())
+                .collect(),
+            &d,
         ),
     )?;
 

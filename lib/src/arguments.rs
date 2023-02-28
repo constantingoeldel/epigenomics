@@ -44,11 +44,11 @@ pub struct Args {
 
     /// Provide an edgefile
     #[arg(long, short)]
-    pub edges: std::path::PathBuf,
+    pub edges: Option<std::path::PathBuf>,
 
     /// Provide a nodefile - paths will be updated to match the output directory
     #[arg(long, short)]
-    pub nodes: std::path::PathBuf,
+    pub nodes: Option<std::path::PathBuf>,
 
     /// Also run AlphaBeta on every window after extraction, results will be stored in the same directory as the segments
     #[arg(long, default_value_t = false)]
@@ -57,6 +57,12 @@ pub struct Args {
     /// Name of the run to be used when storing the result in Postgres
     #[arg(long, default_value_t = format!("{:?}", std::time::Instant::now()))]
     pub name: String,
+
+    /// Let the cutoff be the gene length instead of a fixed number.
+    /// So if the gene is 1000 bp long, the cutoff will be 1000 bp instead of 2048 bp (the default).
+    /// This option takes preference over the cutoff option.    
+    #[arg(long, default_value_t = false)]
+    pub cutoff_gene_length: bool,
 }
 
 impl Default for Args {
@@ -71,10 +77,11 @@ impl Default for Args {
             output_dir: String::from("also default"),
             window_size: 5,
             window_step: 1,
-            edges: PathBuf::new(),
-            nodes: PathBuf::new(),
+            edges: None,
+            nodes: None,
             alphabeta: false,
             name: String::new(),
+            cutoff_gene_length: false,
         }
     }
 }

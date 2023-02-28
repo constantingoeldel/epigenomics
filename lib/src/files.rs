@@ -11,12 +11,8 @@ pub fn open_file(path: &PathBuf, filename: &OsString) -> Result<File> {
 }
 
 pub fn lines_from_file(filename: &str) -> Result<io::Lines<io::BufReader<File>>> {
-    let file = File::open(filename).map_err(|_| {
-        Error::File(
-            String::from("Could not find Annotation file on path "),
-            String::from(filename),
-        )
-    })?;
+    let file = File::open(filename)
+        .map_err(|_| Error::File(String::from("annotation file"), String::from(filename)))?;
     Ok(io::BufReader::new(file).lines())
 }
 

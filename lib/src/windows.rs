@@ -146,6 +146,20 @@ impl Windows {
         output
     }
 
+    pub fn print_all_distributions(nodes: Vec<String>, distibutions: &Vec<Vec<i32>>) -> String {
+        let mut output = String::new();
+        for (_i, (values, node)) in distibutions.iter().zip(nodes.iter()).enumerate() {
+            output.push_str(node);
+            output.push(';');
+
+            for value in values {
+                output.push_str(&format!("{value};"));
+            }
+            output.push('\n');
+        }
+        output
+    }
+
     pub fn save(&self, args: &Args, filename: &OsString) -> Result<()> {
         for windows in vec![
             (&self.upstream, "upstream"),
@@ -155,13 +169,15 @@ impl Windows {
         .iter()
         {
             for (window, cg_sites) in windows.0.iter().enumerate() {
-                let output_file = format!(
-                    "{}/{}/{}/{}",
+                let output_dir = format!(
+                    "{}/{}/{}",
                     args.output_dir,
                     windows.1,
                     window * args.window_step as usize,
-                    filename.to_str().unwrap()
                 );
+                fs::create_dir_all(&output_dir)?;
+                let output_file = output_dir + filename.to_str().unwrap();
+
                 let mut file = OpenOptions::new()
                     .append(true)
                     .create(true)
@@ -210,10 +226,10 @@ pub fn extract_windows(
         pb.inc(1);
         if let Ok(line) = line_result {
             // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
-            let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
+            let Some(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
 
-            if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
-                last_gene = cg.find_gene(&genome, args.cutoff);
+            if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), &args) {
+                last_gene = cg.find_gene(&genome, &args);
             }
             if let Some(gene) = last_gene {
                 cg.place_in_windows(gene, &mut windows, &args);
