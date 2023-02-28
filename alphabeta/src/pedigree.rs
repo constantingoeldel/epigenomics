@@ -152,7 +152,7 @@ impl Pedigree {
                 let line = line.expect("Could not read line");
                 let methylation = MethylationSite::from_methylome_file_line(&line, false);
 
-                if methylation.is_err() {
+                if methylation.is_none() {
                     continue;
                 }
 

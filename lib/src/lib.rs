@@ -1,4 +1,5 @@
 #![feature(option_result_contains)]
+#![feature(let_chains)]
 
 use crate::{arguments::Args, error::Error};
 
@@ -27,6 +28,10 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     let start = std::time::Instant::now();
     let mut args = args;
 
+    if args.alphabeta && (args.nodes.is_none() || args.edges.is_none()) {
+        panic!("You need to specify the nodes and edges file when using the alphabeta method");
+    }
+
     // Adj ust window_step to default value
     if args.window_step == 0 {
         args.window_step = args.window_size;
@@ -45,6 +50,10 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
         }
     }
 
+    if genes.is_empty() {
+        return Err(Error::Simple("Could not parse a single annotation from the annotation file. Please check your input or add a parser implemenation for your data format."));
+    }
+
     // number of different chromosomes assuming they are named from 1 to highest
     let chromosome_count = genes
         .iter()
@@ -55,37 +64,13 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     genes.sort_by_key(|g| g.start); // Sort genes by start bp (propably already the case), needed for binary search
 
     // Structure genes first by chromosome, then by + and - strand => [Chromosome_1(+ Strand, - Strand), Chromosome_2(+,-), ..]
-    let mut structured_genes: Vec<GenesByStrand> = vec![
-        GenesByStrand {
-            sense: Vec::new(),
-            antisense: Vec::new()
-        };
-        chromosome_count.into()
-    ];
+    let mut structured_genes: Vec<GenesByStrand> =
+        vec![GenesByStrand::new(); chromosome_count.into()];
     // Put genes into their correct bucket
-    let mut gene_length_sum = 0;
-    let mut sense_gene_count = 0;
     genes.iter().for_each(|g| {
         let chromosome = &mut structured_genes[(g.chromosome - 1) as usize];
-        let strand = match &g.strand {
-            Strand::Sense => &mut chromosome.sense,
-            Strand::Antisense => &mut chromosome.antisense,
-            _ => return,
-        };
-        if g.strand == Strand::Sense {
-            sense_gene_count += 1;
-        }
-        gene_length_sum += g.end - g.start;
-        strand.push(g.to_owned());
+        chromosome.insert(g.to_owned());
     });
-    let average_gene_length = gene_length_sum / genes.len() as u32;
-    println!(
-        "Average gene length: {} bp, {} genes, of which {} are on the sense strand and {} on the antisense strand",
-        average_gene_length,
-        genes.len(),
-        sense_gene_count,
-        genes.len() - sense_gene_count
-    );
 
     // Determine the maximum gene length by iterating over all genes
     let mut max_gene_length: u32 = 100; // if not using absolute window sizes, the maximum gene length will be 100%

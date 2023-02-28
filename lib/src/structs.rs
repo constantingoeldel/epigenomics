@@ -2,7 +2,10 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 
-use crate::error;
+use crate::{
+    error::{self, Error},
+    print_dev,
+};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
@@ -15,6 +18,35 @@ pub enum Strand {
     Antisense,
     #[sqlx(rename = "*")]
     Unknown,
+}
+
+impl<'a> TryFrom<&'a str> for Strand {
+    type Error = Error;
+    fn try_from(s: &str) -> Result<Self> {
+        match s {
+            "+" => Ok(Self::Sense),
+            "-" => Ok(Self::Antisense),
+            "*" => Ok(Self::Unknown),
+            _ => Err(Error::Simple("Invalid strand")),
+        }
+    }
+}
+
+impl Strand {
+    pub fn correct_format(s: &str) -> bool {
+        matches!(s, "+" | "-" | "*")
+    }
+
+    pub fn invert(self, invert: bool) -> Self {
+        if !invert {
+            return self;
+        }
+        match self {
+            Self::Sense => Self::Antisense,
+            Self::Antisense => Self::Sense,
+            Self::Unknown => Self::Unknown,
+        }
+    }
 }
 
 impl PartialEq for Strand {
@@ -61,6 +93,7 @@ pub struct Gene {
 pub struct GenesByStrand {
     pub sense: Vec<Gene>,
     pub antisense: Vec<Gene>,
+    pub combined: Vec<Gene>,
 }
 
 impl Default for GenesByStrand {
@@ -74,17 +107,12 @@ impl GenesByStrand {
         GenesByStrand {
             sense: Vec::new(),
             antisense: Vec::new(),
+            combined: Vec::new(),
         }
     }
 
-    pub fn chain(&self) -> Vec<&Gene> {
-        let sense_iter = self.sense.iter();
-        let antisense_iter = self.antisense.iter();
-
-        sense_iter.chain(antisense_iter).collect()
-    }
-
     pub fn insert(&mut self, gene: Gene) {
+        self.combined.push(gene.clone());
         match gene.strand {
             Strand::Sense => self.sense.push(gene),
             Strand::Antisense => self.antisense.push(gene),
@@ -95,26 +123,61 @@ impl GenesByStrand {
     pub fn sort(&mut self) {
         self.sense.sort_by(|a, b| a.start.cmp(&b.start));
         self.antisense.sort_by(|a, b| a.start.cmp(&b.start));
+        self.combined.sort_by(|a, b| a.start.cmp(&b.start));
     }
 }
 
 impl Gene {
     pub fn from_annotation_file_line(s: &str, invert_strand: bool) -> Option<Self> {
-        s.split('\t')
-            .collect_tuple()
-            .map(|(chromosome, start, end, name, annotation, strand)| Gene {
-                chromosome: chromosome.parse::<u8>().unwrap(),
-                start: start.parse::<u32>().unwrap(),
-                end: end.parse::<u32>().unwrap(),
-                name: String::from(name),
-                annotation: String::from(annotation),
-                strand: if (strand == "+") ^ invert_strand {
-                    // XOR: if the strand is + and we don't want to invert it, or if the strand is - and we do want to invert it -> Sense
-                    Strand::Sense
-                } else {
-                    Strand::Antisense
-                },
-            })
+        let first_format = |s: &str| {
+            s.split([' ', '\t'])
+                .collect_tuple()
+                .filter(|(_, _, _, _, _, strand)| Strand::correct_format(strand))
+                .map(|(chromosome, start, end, name, annotation, strand)| {
+                    let strand: Strand = strand.try_into()?;
+                    Ok(Gene {
+                        chromosome: chromosome.parse::<u8>()?,
+                        start: start.parse::<u32>()?,
+                        end: end.parse::<u32>()?,
+                        name: String::from(name),
+                        annotation: String::from(annotation),
+                        strand: strand.invert(invert_strand),
+                    })
+                })
+        };
+
+        // seqnames	start	end	width	strand	gbM.id
+        // 1	6362000	6362200	201	*	AT1G18480
+        let second_format = |s: &str| {
+            s.split([' ', '\t'])
+                .collect_tuple()
+                .filter(|(_, _, _, _, strand, _)| Strand::correct_format(strand))
+                .map(|(chromosome, start, end, _width, strand, name)| {
+                    let strand: Strand = strand.try_into()?;
+                    Ok(Gene {
+                        chromosome: chromosome.parse::<u8>()?,
+                        start: start.parse::<u32>()?,
+                        end: end.parse::<u32>()?,
+                        name: String::from(name),
+                        annotation: String::new(),
+                        strand: strand.invert(invert_strand),
+                    })
+                })
+        };
+
+        let results: Option<Result<Gene>> = first_format(s).or_else(|| second_format(s)).or(None);
+
+        match results {
+            Some(Ok(methylation_site)) => Some(methylation_site),
+            Some(Err(e)) => {
+                print_dev!("Non-fatal error when parsing gene: {e}\nLine: {s}");
+                None
+            }
+            None => {
+                print_dev!("Could not find a suitable parser for line: {s}");
+                None
+            }
+        }
     }
 }
 

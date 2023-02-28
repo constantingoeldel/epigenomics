@@ -2,12 +2,31 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 
+#[macro_export]
+macro_rules! print_dev {
+    ($($rest:tt)*) => {
+        #[cfg(debug_assertions)]
+        std::println!($($rest)*)
+    }
+}
+
 use crate::*;
 
+/// Basic Data Type for a Methylation Site
+///
+/// Includes conversion from a .bed file line in several formats. If your program fails,
+/// check if the format of your .bed file is supported.
+///
+/// If not, simply add your own conversion function and submit a pull request.
+///
+/// Most times, only one position is mentioned, but in some cases, a range is given.
+/// If only one location, we assign `start` to that and `end` to `start + 1`, as a cg site is two nucleotides long.
+///
 #[derive(Clone, PartialEq, Debug)]
 pub struct MethylationSite {
     pub chromosome: u8,
-    pub location: u32,
+    pub start: u32,
+    pub end: u32,
     pub strand: Strand,
     pub original: String,
     pub context: String,
@@ -23,7 +42,8 @@ impl Default for MethylationSite {
     fn default() -> Self {
         MethylationSite {
             chromosome: 1,
-            location: 1,
+            start: 1,
+            end: 2,
             strand: Strand::Unknown,
             original: String::new(),
             context: String::new(),
@@ -68,7 +88,8 @@ impl From<char> for MethylationStatus {
 impl MethylationSite {
     pub fn new(location: u32, strand: Strand) -> Self {
         MethylationSite {
-            location,
+            start: location,
+            end: location + 1,
             strand,
             ..Default::default()
         }
@@ -91,134 +112,179 @@ impl MethylationSite {
     ///
     /// One pitfall of this implementation is the `collect tuple` call, which only yields a `Some` value if the line has exactly 9 or 10 tab-separated fields.
     /// Some files provide the trinucleotide, others don't, so there are two versions.
-    pub fn from_methylome_file_line(s: &str, invert_strand: bool) -> Result<Self> {
-        let first_format = s
-            .split('\t')
-            .collect_tuple()
-            .filter(|(_, _, _, context, _, _, _, _, _)| context == &"CG")
-            .map(
-                |(
-                    chromosome,
-                    location,
-                    strand,
-                    context,
-                    count_methylated,
-                    count_total,
-                    posteriormax,
-                    status,
-                    meth_lvl,
-                )| {
+    pub fn from_methylome_file_line(s: &str, invert_strand: bool) -> Option<Self> {
+        let first_format = |s: &str| {
+            s.split('\t')
+                .collect_tuple()
+                .filter(|(_, _, _, context, _, _, _, _, _)| context == &"CG")
+                .map(
+                    |(
+                        chromosome,
+                        location,
+                        strand,
+                        context,
+                        count_methylated,
+                        count_total,
+                        posteriormax,
+                        status,
+                        meth_lvl,
+                    )| {
+                        Ok(MethylationSite {
+                            chromosome: chromosome.parse::<u8>()?,
+                            start: location.parse::<u32>()?,
+                            end: location.parse::<u32>()? + 1,
+                            strand: if (strand == "+") ^ invert_strand {
+                                Strand::Sense
+                            } else {
+                                Strand::Antisense
+                            },
+                            original: s.to_owned(),
+                            context: String::from(context),
+                            count_methylated: count_methylated.parse::<u32>()?,
+                            count_total: count_total.parse::<u32>()?,
+                            posteriormax: posteriormax.parse::<f64>()?,
+                            status: status
+                                .chars()
+                                .next()
+                                .ok_or(Error::Simple("Status could not included in file"))?
+                                .into(),
+                            meth_lvl: meth_lvl.parse::<f64>()?,
+                            context_trinucleotide: String::from("XXX"),
+                        })
+                    },
+                )
+                .unwrap_or(Err(Error::Simple("Wrong format")))
+        };
+
+        let second_format = |s: &str| {
+            s.split('\t')
+                .collect_tuple()
+                .filter(|(_, _, _, context, _, _, _, _, _, _)| context == &"CG")
+                .map(
+                    |(
+                        chromosome,
+                        location,
+                        strand,
+                        context,
+                        count_methylated,
+                        count_total,
+                        posteriormax,
+                        status,
+                        meth_lvl,
+                        trinucleotide,
+                    )| {
+                        Ok(MethylationSite {
+                            chromosome: chromosome.parse::<u8>()?,
+                            start: location.parse::<u32>()?,
+                            end: location.parse::<u32>()? + 1,
+                            strand: if (strand == "+") ^ invert_strand {
+                                Strand::Sense
+                            } else {
+                                Strand::Antisense
+                            },
+                            original: s.to_owned(),
+                            context: String::from(context),
+                            count_methylated: count_methylated.parse::<u32>()?,
+                            count_total: count_total.parse::<u32>()?,
+                            posteriormax: posteriormax.parse::<f64>()?,
+                            status: status
+                                .chars()
+                                .next()
+                                .ok_or(Error::Simple("Status could not be parsed"))?
+                                .into(),
+                            meth_lvl: meth_lvl.parse::<f64>()?,
+                            context_trinucleotide: String::from(trinucleotide),
+                        })
+                    },
+                )
+                .unwrap_or(Err(Error::Simple("Wrong format")))
+        };
+
+        let third_format = |s: &str| {
+            s.split('\t')
+                .collect_tuple()
+                .filter(|(_, _, _, context, _, _, _, _, _, _, _)| context == &"CG")
+                .map(
+                    |(
+                        chromosome,
+                        first_nucleotide,
+                        second_nucleotide,
+                        context,
+                        _, // No idea what that is
+                        strand,
+                        count_methylated,
+                        count_total,
+                        posteriormax,
+                        status,
+                        meth_lvl,
+                    )| {
+                        Ok(MethylationSite {
+                            chromosome: chromosome.parse()?,
+                            start: first_nucleotide.parse::<u32>()?,
+                            end: second_nucleotide.parse::<u32>()?,
+                            strand: if (strand == "+") ^ invert_strand {
+                                Strand::Sense
+                            } else {
+                                Strand::Antisense
+                            },
+                            original: s.to_owned(),
+                            context: String::from(context),
+                            count_methylated: count_methylated.parse::<u32>()?,
+                            count_total: count_total.parse::<u32>()?,
+                            posteriormax: posteriormax.parse::<f64>()?,
+                            status: status
+                                .chars()
+                                .next()
+                                .ok_or(Error::Simple("Status could not be parsed"))?
+                                .into(),
+                            meth_lvl: meth_lvl.parse::<f64>()?,
+                            context_trinucleotide: String::from("XXX"),
+                        })
+                    },
+                )
+                .unwrap_or(Err(Error::Simple("Wrong format")))
+        };
+
+        // Chromatin State files
+        // 1	131800	132400	E10
+        let chromatin_state = |s: &str| {
+            s.split(['\t', ' '])
+                .collect_tuple()
+                .map(|(chromosome, start, end, state)| {
                     Ok(MethylationSite {
-                        chromosome: chromosome.parse::<u8>()?,
-                        location: location.parse::<u32>()?,
-                        strand: if (strand == "+") ^ invert_strand {
-                            Strand::Sense
-                        } else {
-                            Strand::Antisense
-                        },
-                        original: s.to_owned(),
-                        context: String::from(context),
-                        count_methylated: count_methylated.parse::<u32>()?,
-                        count_total: count_total.parse::<u32>()?,
-                        posteriormax: posteriormax.parse::<f64>()?,
-                        status: status
-                            .chars()
-                            .next()
-                            .ok_or(Error::Simple("Status could not included in file"))?
-                            .into(),
-                        meth_lvl: meth_lvl.parse::<f64>()?,
-                        context_trinucleotide: String::from("XXX"),
-                    })
-                },
-            );
-        if let Some(site) = first_format {
-            return site;
-        }
-        let second_format: Option<Result<MethylationSite>> = s
-            .split('\t')
-            .collect_tuple()
-            .filter(|(_, _, _, context, _, _, _, _, _, _)| context == &"CG")
-            .map(
-                |(
-                    chromosome,
-                    location,
-                    strand,
-                    context,
-                    count_methylated,
-                    count_total,
-                    posteriormax,
-                    status,
-                    meth_lvl,
-                    trinucleotide,
-                )| {
-                    Ok(MethylationSite {
-                        chromosome: chromosome.parse::<u8>()?,
-                        location: location.parse::<u32>()?,
-                        strand: if (strand == "+") ^ invert_strand {
-                            Strand::Sense
-                        } else {
-                            Strand::Antisense
-                        },
-                        original: s.to_owned(),
-                        context: String::from(context),
-                        count_methylated: count_methylated.parse::<u32>()?,
-                        count_total: count_total.parse::<u32>()?,
-                        posteriormax: posteriormax.parse::<f64>()?,
-                        status: status
-                            .chars()
-                            .next()
-                            .ok_or(Error::Simple("Status could not be parsed"))?
-                            .into(),
-                        meth_lvl: meth_lvl.parse::<f64>()?,
-                        context_trinucleotide: String::from(trinucleotide),
-                    })
-                },
-            );
-
-        if let Some(site) = second_format {
-            return site;
-        }
-
-        // let bigwig_format: Option<Result<MethylationSite>> =
-        //     s.split('\t')
-        //         .collect_tuple()
-        //         .map(|(chromosome, start, end, _name, _some_number)| {
-        //             let start = start.parse::<u32>()?;
-        //             let end = end.parse::<u32>()?;
-        //             let location_as_midpoint = start + start.abs_diff(end) / 2;
-
-        //             Ok(MethylationSite {
-        //                 chromosome: chromosome.chars().nth(3).unwrap().to_string().parse()?,
-        //                 strand: Strand::Unknown,
-        //                 location: location_as_midpoint,
-        //                 context: String::from("Modification"),
-        //                 context_trinucleotide: String::new(),
-        //                 count_methylated: 0,
-        //                 count_total: 0,
-        //                 meth_lvl: 0.0,
-        //                 original: s.to_owned(),
-        //                 posteriormax: 0.0,
-        //                 status: MethylationStatus::U,
-        //             })
-        //         });
-
-        // if let Some(site) = bigwig_format {
-        //     return site;
-        // }
-        // _header	0	1	bar.1	#bedGraph section chr1:2-6173
-        let bigwig_format_2: Option<Result<MethylationSite>> = s
-            .split(['\t', ' '])
-            .collect_tuple()
-            .map(|(_, _, _, _, _, _, content)| {
-                if let Some((chromosome, start, end)) = content.split([':', '-']).collect_tuple() {
-                    let start = start.parse::<u32>()?;
-                    let end = end.parse::<u32>()?;
-                    let location_as_midpoint = start + start.abs_diff(end) / 2;
-
-                    Ok(MethylationSite {
-                        chromosome: chromosome.chars().nth(3).unwrap().to_string().parse()?,
+                        chromosome: chromosome.parse()?,
                         strand: Strand::Unknown,
-                        location: location_as_midpoint,
+                        start: start.parse::<u32>()?,
+                        end: end.parse::<u32>()?,
+                        context: String::from(state),
+                        context_trinucleotide: String::new(),
+                        count_methylated: 0,
+                        count_total: 0,
+                        meth_lvl: 0.0,
+                        original: s.to_owned(),
+                        posteriormax: 0.0,
+                        status: MethylationStatus::U,
+                    })
+                })
+                .unwrap_or(Err(Error::Simple("Wrong format")))
+        };
+
+        // #bedGraph section chr1:1-3480
+        // chr1	1	4	1
+        let bigwig_format = |s: &str| {
+            s.split(['\t', ' '])
+                .collect_tuple()
+                .map(|(chromosome, start, end, _length)| {
+                    Ok(MethylationSite {
+                        chromosome: chromosome
+                            .chars()
+                            .nth(3)
+                            .ok_or(Error::Simple("Not enough chars in chromosome str"))?
+                            .to_string()
+                            .parse()?,
+                        strand: Strand::Unknown,
+                        start: start.parse::<u32>()?,
+                        end: end.parse::<u32>()?,
                         context: String::from("Modification"),
                         context_trinucleotide: String::new(),
                         count_methylated: 0,
@@ -228,71 +294,38 @@ impl MethylationSite {
                         posteriormax: 0.0,
                         status: MethylationStatus::U,
                     })
-                } else {
-                    Err(Error::Simple("Could not parse"))
-                }
-            });
+                })
+                .unwrap_or(Err(Error::Simple("Wrong format")))
+        };
 
-        if let Some(site) = bigwig_format_2 {
-            return site;
+        let results: Result<MethylationSite> = first_format(s)
+            .or_else(|_| second_format(s))
+            .or_else(|_| third_format(s))
+            .or_else(|_| chromatin_state(s))
+            .or_else(|_| bigwig_format(s));
+
+        match results {
+            Ok(methylation_site) => Some(methylation_site),
+            Err(e) => {
+                print_dev!("Non-fatal error when parsing methylation site: {e}\nLine: {s}");
+                None
+            }
         }
-
-        let third_format: Option<Result<MethylationSite>> = s
-            .split('\t')
-            .collect_tuple()
-            .filter(|(_, _, _, context, _, _, _, _, _, _, _)| context == &"CG")
-            .map(
-                |(
-                    chromosome,
-                    first_nucleotide,
-                    second_nucleotide,
-                    context,
-                    _, // No idea what that is
-                    strand,
-                    count_methylated,
-                    count_total,
-                    posteriormax,
-                    status,
-                    meth_lvl,
-                )| {
-                    Ok(MethylationSite {
-                        chromosome: chromosome.parse()?,
-                        location: if strand == "+" {
-                            first_nucleotide.parse::<u32>()?
-                        } else {
-                            second_nucleotide.parse::<u32>()?
-                        },
-                        strand: if (strand == "+") ^ invert_strand {
-                            Strand::Sense
-                        } else {
-                            Strand::Antisense
-                        },
-                        original: s.to_owned(),
-                        context: String::from(context),
-                        count_methylated: count_methylated.parse::<u32>()?,
-                        count_total: count_total.parse::<u32>()?,
-                        posteriormax: posteriormax.parse::<f64>()?,
-                        status: status
-                            .chars()
-                            .next()
-                            .ok_or(Error::Simple("Status could not be parsed"))?
-                            .into(),
-                        meth_lvl: meth_lvl.parse::<f64>()?,
-                        context_trinucleotide: String::from("XXX"),
-                    })
-                },
-            );
-        third_format.ok_or(Error::CGSite)?
     }
 
     /// Checks weather a given CG site belongs to a specific gene. The cutoff is the number of bases upstream and downstream of the gene to consider the CG site in the gene. For example, a cutoff of 1000 would consider a CG site 1000 bases upstream of the gene to be in the gene.
     /// To strictly check weather a CG site is within the gene region, pass a cutoff of 0.
     ///
     /// Passing a negative cutoff is possible but leads to undefined behaviour if used together with ``find_gene``.
-    pub fn is_in_gene(&self, gene: &Gene, cutoff: u32) -> bool {
+    pub fn is_in_gene(&self, gene: &Gene, args: &Args) -> bool {
+        let cutoff = if args.cutoff_gene_length {
+            gene.end - gene.start
+        } else {
+            args.cutoff
+        };
         self.chromosome == gene.chromosome
-            && gene.start <= self.location + cutoff
-            && self.location <= gene.end + cutoff
+            && gene.start <= self.start + cutoff
+            && self.end <= gene.end + cutoff
             && self.strand == gene.strand
     }
 
@@ -304,23 +337,34 @@ impl MethylationSite {
     pub fn find_gene<'long>(
         &self,
         genome: &'long [GenesByStrand],
-        cutoff: u32,
+        args: &Args,
     ) -> Option<&'long Gene> {
         let chromosome = &genome[(self.chromosome - 1) as usize];
-        let strand: Vec<&Gene> = match self.strand {
-            Strand::Sense => chromosome.sense.iter().collect(), // This is a large performance hit. Is there a better way to do this?
-            Strand::Antisense => chromosome.antisense.iter().collect(),
-            Strand::Unknown => chromosome.chain(),
+        let strand: &Vec<Gene> = match self.strand {
+            Strand::Sense => &chromosome.sense, // This is a performance hit. Is there a better way to do this?
+            Strand::Antisense => &chromosome.antisense,
+            Strand::Unknown => &chromosome.combined,
         };
+
+        let search = |gene: &Gene| {
+            if args.cutoff_gene_length {
+                gene.end + (gene.end - gene.start)
+            } else {
+                gene.end + args.cutoff
+            }
+        };
+
         let first_matching_gene_index = strand
-            .binary_search_by_key(&self.location, |gene| gene.end + cutoff)
+            .binary_search_by_key(&self.start, search)
             .unwrap_or_else(|x| x); // Collapse exact match on gene end and closest previous match into one, as both are valid
+
         if strand.len() < first_matching_gene_index + 1 {
             return None;
         }
 
         let gene = &strand[first_matching_gene_index];
-        if self.is_in_gene(gene, cutoff) {
+
+        if self.is_in_gene(gene, args) {
             return Some(gene);
         }
 
@@ -338,7 +382,7 @@ impl MethylationSite {
     ) -> Vec<(Region, usize)> // Return a vector of (strand, window) tuples for each window the CG site is in
     {
         const E: f64 = 0.1; // Epsilon for floating point comparison
-        let location = self.location as f64;
+        let location = self.start as f64;
         let cutoff = args.cutoff as f64;
         let step = args.window_step as f64;
         let size = args.window_size as f64;
@@ -405,7 +449,7 @@ impl Display for MethylationSite {
         write!(
             f,
             "CG site is located on the {} strand of chromosome {} at bp {}",
-            self.strand, self.chromosome, self.location
+            self.strand, self.chromosome, self.start
         )
     }
 }
@@ -416,35 +460,6 @@ mod tests {
     use super::MethylationSite;
     use crate::*;
 
-    // let GENE: Gene = Gene {
-    //     annotation: String::new(),
-    //     chromosome: 1,
-    //     start: 50,
-    //     end: 100,
-    //     strand: Strand::Sense,
-    //     name: String::new(),
-    // };
-    // let WITHIN_CG: MethylationSite = MethylationSite::new(80, Strand::Sense);
-
-    // let OPPOSITE_STRAND_CG: MethylationSite = MethylationSite::new(80, Strand::Antisense);
-
-    // let HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Sense);
-    // let LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Sense);
-    // const ANTI_GENE: Gene = Gene {
-    //     annotation: String::new(),
-    //     chromosome: 1,
-    //     start: 50,
-    //     end: 100,
-    //     strand: Strand::Antisense,
-    //     name: String::new(),
-    // };
-    // const ANTI_WITHIN_CG: MethylationSite = MethylationSite::new(80, Strand::Antisense);
-
-    // const ANTI_OPPOSITE_STRAND_CG: MethylationSite = MethylationSite::new(80, Strand::Sense);
-
-    // const ANTI_HIGHER_CG: MethylationSite = MethylationSite::new(150, Strand::Antisense);
-    // const ANTI_LOWER_CG: MethylationSite = MethylationSite::new(0, Strand::Antisense);
-
     #[test]
     fn test_instantiate_from_methylome_file_line() {
         let line = "1	23151	+	CG	0	8	0.9999	U	0.0025";
@@ -454,71 +469,26 @@ mod tests {
 
     #[test]
     fn test_bigwig_format() {
-        let line = "header	0	1	bar.1	#bedGraph section chr1:1-3480";
-        let cg = MethylationSite::from_methylome_file_line(line, false).unwrap();
-
+        let line = "chr1	7	11	3";
+        let cg = MethylationSite::from_methylome_file_line(line, true).unwrap();
         assert_eq!(cg.chromosome, 1);
-        assert!(cg.location > 50);
-
-        let line = "header	2	3	bar.3	#bedGraph section chr1:9308-13970";
-        let cg = MethylationSite::from_methylome_file_line(line, false).unwrap();
-
-        assert_eq!(cg.chromosome, 1);
-        assert!(cg.location > 9308);
+        assert_eq!(cg.start, 7);
+        assert_eq!(cg.end, 11);
     }
 
     #[test]
     fn test_instantiate_from_methylome_file_line_invalid_line() {
         let line = "1	23151	+	CG	0	8	0.9999	";
         let cg = MethylationSite::from_methylome_file_line(line, false);
-        assert!(cg.is_err());
+        assert!(cg.is_none());
     }
 
     #[test]
     fn test_instantiate_from_methylome_file_line_invalid_chromosome() {
         let line = "X	23151	+	CG	0	8	0.9999	U	0.0025";
         let cg = MethylationSite::from_methylome_file_line(line, false);
-        assert!(cg.is_err());
+        assert!(cg.is_none());
     }
-
-    // #[test]
-    // fn test_is_in_gene() {
-    //     assert!(WITHIN_CG.is_in_gene(&GENE, 0));
-    //     assert!(!HIGHER_CG.is_in_gene(&GENE, 0));
-    //     assert!(HIGHER_CG.is_in_gene(&GENE, 50));
-    //     assert!(!LOWER_CG.is_in_gene(&GENE, 0));
-    //     assert!(LOWER_CG.is_in_gene(&GENE, 50));
-    // }
-
-    // #[test]
-    // fn test_find_gene() {
-    //     let mut genes = GenesByStrand::new();
-    //     for i in 0..100 {
-    //         genes.insert(Gene {
-    //             annotation: String::new(),
-    //             chromosome: 1,
-    //             start: i,
-    //             end: i + 50,
-    //             strand: Strand::Sense,
-    //             name: String::new(),
-    //         });
-    //     }
-
-    //     let genome = vec![genes.clone()];
-    //     assert!(OPPOSITE_STRAND_CG.find_gene(&genome, 0).is_none());
-    //     assert_eq!(
-    //         Some(WITHIN_CG.find_gene(&genome, 0)),
-    //         Some(genes.sense.get(30))
-    //     );
-    //     assert_eq!(
-    //         Some(HIGHER_CG.find_gene(&genome, 50)),
-    //         Some(genes.sense.get(50))
-    //     );
-    //     assert_eq!(
-    //         Some(LOWER_CG.find_gene(&genome, 50)),
-    //         Some(genes.sense.get(0))
-    //     );
-    // }
 
     #[test]
     fn test_extract_gene() {}
