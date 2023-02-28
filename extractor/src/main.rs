@@ -11,6 +11,7 @@ async fn main() {
     match extract(args.clone()) {
         Err(e) => println!("Error: {e}"),
         Ok((max_gene_length, distribution)) => {
+            dbg!(&distribution.len());
             if args.alphabeta {
                 let regions = vec![
                     (Region::Upstream, args.cutoff),
@@ -69,13 +70,13 @@ async fn main() {
                     }
                 }
                 pb.finish();
-
                 let mut print = String::from("run;window;cg_count;region;alpha;beta;alpha_error;beta_error;1/2*(alpha+beta);pred_steady_state\n");
 
                 let steady_state = |alpha: f64, beta: f64| {
                     (alpha * ((1.0 - alpha).powi(2) - (1.0 - beta).powi(2) - 1.0))
                         / ((alpha + beta) * ((alpha + beta - 1.0).powi(2) - 2.0))
                 };
+                dbg!(&distribution.len());
                 for (i, ((model, sd, region), d)) in
                     results.iter().zip(distribution.iter()).enumerate()
                 {

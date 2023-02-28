@@ -22,7 +22,7 @@ pub struct Model {
     pub weight: f64,
     pub intercept: f64,
 }
-
+#[derive(Debug)]
 pub struct StandardDeviations {
     pub alpha: f64,
     pub beta: f64,

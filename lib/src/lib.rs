@@ -138,10 +138,11 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
         "{}/all_steady_state_methylation.txt",
         &args.output_dir.display()
     );
+    let all_distributions_file = format!("{}/distributions.txt", &args.output_dir.display());
 
     let names = methylome_files.iter().map(|f| file_name(f)).collect();
 
-    for (distribution, file) in distributions.iter().zip(methylome_files) {
+    for (distribution, file) in distributions.iter().zip(&methylome_files) {
         fs::write(
             format!(
                 "{}/distribution_{}",
@@ -156,13 +157,19 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     fs::write(
         methylation_file,
         Windows::print_steady_state_methylation(&average_methylation),
-    )
-    .unwrap();
+    )?;
     fs::write(
         all_methylations_file,
         Windows::print_all_steady_state_methylations(names, steady_state_meth),
-    )
-    .unwrap();
+    )?;
+
+    fs::write(
+        all_distributions_file,
+        Windows::print_all_distributions(
+            methylome_files.iter().map(|f| file_name(f)).collect(),
+            &distributions,
+        ),
+    )?;
 
     println!("Done in: {:?}", start.elapsed());
 

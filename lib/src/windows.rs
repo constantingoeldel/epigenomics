@@ -138,7 +138,6 @@ impl Windows {
         let mut u: Vec<i32> = self.upstream.iter().map(|w| w.len() as i32).collect();
         let mut g: Vec<i32> = self.gene.iter().map(|w| w.len() as i32).collect();
         let mut d: Vec<i32> = self.downstream.iter().map(|w| w.len() as i32).collect();
-
         g.append(&mut d);
         u.append(&mut g);
         u
@@ -209,7 +208,8 @@ impl Windows {
                         }
                     }
 
-                    if error_count > 1 || sites.len() < 5 {
+                    if error_count > 5 || sites.len() < 5 {
+                        dbg!(error_count, &sites.len());
                         continue;
                     } else {
                         result.get_mut(&region).push(sites);

@@ -51,16 +51,16 @@
 # -s 1 -w 5 
 
 
-# # # col 
-#  cargo run --release -- \
-#  -m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
-#  -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
-#  -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/windows_col \
-#  -e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_col_mock.tsv \
-#  -n ../../methylome/nodelist_col_mock.tsv \
-#  --name col \
-#  -s 1 -w 5 \
-# --alphabeta
+# # col 
+ cargo run --release -- \
+ -m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
+ -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+ -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/windows_col \
+ -e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_col_mock.tsv \
+ -n ../../methylome/nodelist_col_mock.tsv \
+ --name col \
+ -s 1 -w 5 \
+--alphabeta
 
 # mods
 # cargo run --release -- \
