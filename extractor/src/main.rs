@@ -1,7 +1,6 @@
 use std::{fmt::Write, fs::write, path::Path, time::Duration};
 
 use clap::Parser;
-use db::import_results;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use lib::{arguments::Args, structs::Region, *};
 
@@ -101,10 +100,10 @@ async fn main() {
 
                 write(args.output_dir + "/results.txt", print)
                     .expect("Could not save results to file.");
-                let db = db::connect()
-                    .await
-                    .expect("Could not connect to database: Did you provide a connection string?");
-                import_results(&db, args.name, results).await.expect("Could not save results to a database. Your data is stored in files in each directory");
+                // let db = db::connect()
+                //     .await
+                //     .expect("Could not connect to database: Did you provide a connection string?");
+                //   import_results(&db, args.name, results).await.expect("Could not save results to a database. Your data is stored in files in each directory");
             }
         }
     }

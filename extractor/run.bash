@@ -27,16 +27,16 @@
 # --name suv \
 # -s 1 -w 5 
 
-# ros 
-cargo run --release -- \
--m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
--g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
--o ../../windows \
--e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_ros_mock.tsv \
--n /mnt/nas/zhilin/others/constantin-sergio/biostress-data/nodelist_ros_mock.tsv \
---name ros \
---alphabeta \
--s 1 -w 5 
+# # ros 
+# cargo run --release -- \
+# -m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
+# -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+# -o ../../windows \
+# -e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_ros_mock.tsv \
+# -n /mnt/nas/zhilin/others/constantin-sergio/biostress-data/nodelist_ros_mock.tsv \
+# --name ros \
+# --alphabeta \
+# -s 1 -w 5 
 
 # # nrpe 
 # cargo run --release -- \
@@ -59,3 +59,32 @@ cargo run --release -- \
 # --name col \
 # -s 1 -w 5 
 
+mods
+cargo run --release -- \
+-m ../../modifications/bed \
+-g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+-s 1 -w 1 \
+-o ../../windows \
+# --cutoff-gene-length
+
+
+# # chromatin states
+# cargo run --release -- \
+# -m ../../chr_states \
+# -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+# -s 1 -w 1 \
+# -o ../../windows \
+
+# # chromatin states within red CS && gbM genes
+# cargo run  -- \
+# -m ../../chr_states \
+# -g ../../methylome/redCS_SPMRs_in_gbM_genes.txt \
+# -s 1 -w 1 \
+# -o ../../windows \
+
+# # chromatin states within red CS
+# cargo run --release -- \
+# -m ../../chr_states \
+# -g ../../methylome/redCS-SPMRs.bed \
+# -s 1 -w 1 \
+# -o ../../windows \
