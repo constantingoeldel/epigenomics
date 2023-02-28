@@ -1,3 +1,5 @@
+#![feature(option_result_contains)]
+
 use crate::{arguments::Args, error::Error};
 
 use files::*;
@@ -6,8 +8,6 @@ pub use methylation_site::*;
 use rayon::prelude::*;
 use setup::set_up_output_dir;
 use std::{
-    ffi::OsString,
-    fmt::format,
     fs::{self, File},
     io::{self, BufRead},
     path::PathBuf,
@@ -34,7 +34,6 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
 
     let methylome_files = load_methylome(&args.methylome)?;
     let annotation_lines = lines_from_file(&args.genome)?;
-    dbg!(methylome_files.len());
     let mut genes: Vec<Gene> = Vec::new();
 
     // Parse annotation file to extract genes
@@ -109,20 +108,20 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
 
     methylome_files.par_iter().try_for_each_with(
         structured_genes,
-        |genome, (path, filename)| -> Result<()> {
-            let file = open_file(path, filename)?;
-            let mut windows = extract_windows(
+        |genome, path| -> Result<()> {
+            let file = open_file(path)?;
+            let mut windows = Windows::extract(
                 file,
                 genome.to_vec(),
                 max_gene_length,
                 args.clone(),
-                filename.to_str().unwrap().to_string(),
+                file_name(path),
                 &bars,
             )?;
             if args.invert {
                 windows = windows.inverse();
             }
-            windows.save(&args, filename)?;
+            windows.save(&args, file_name(path))?;
             let distribution = windows.distribution();
 
             distributions.lock().unwrap().push(distribution);
@@ -134,42 +133,53 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
             Ok(())
         },
     )?;
-    let sample_size = steady_state_methylations.lock().unwrap().len();
-    let mut average_methylation = vec![0.0; steady_state_methylations.lock().unwrap()[0].len()];
-    for source in steady_state_methylations.lock().unwrap().iter() {
+
+    // Removing the mutexes as the paralell part is over
+    let steady_state_meth = steady_state_methylations.into_inner().unwrap();
+    let distributions = distributions.into_inner().unwrap();
+    let sample_size = steady_state_meth.len();
+    let mut average_methylation = vec![0.0; steady_state_meth[0].len()];
+    for source in steady_state_meth.iter() {
         for (i, window) in source.iter().enumerate() {
             average_methylation[i] += window / sample_size as f64
         }
     }
 
-    let distribution_file = format!("{}/distribution.txt", &args.output_dir);
-    let methylation_file = format!("{}/steady_state_methylation.txt", &args.output_dir);
-    let all_methylations_file = format!("{}/all_steady_state_methylation.txt", &args.output_dir);
-    let d = distributions.into_inner().unwrap();
+    let methylation_file = format!(
+        "{}/steady_state_methylation.txt",
+        &args.output_dir.display()
+    );
+    let all_methylations_file = format!(
+        "{}/all_steady_state_methylation.txt",
+        &args.output_dir.display()
+    );
 
-    for (distribution, file) in d.iter().zip(methylome_files.iter().map(|m| &m.1)) {
+    let names = methylome_files.iter().map(|f| file_name(f)).collect();
+
+    for (distribution, file) in distributions.iter().zip(methylome_files) {
         fs::write(
-            format!("{}_{}", &distribution_file, &file.to_string_lossy()),
+            format!(
+                "{}/distribution_{}",
+                &args.output_dir.display(),
+                file_name(&file)
+            ),
             Windows::print_distribution(distribution),
-        )?;
+        )
+        .unwrap();
     }
 
     fs::write(
         methylation_file,
         Windows::print_steady_state_methylation(&average_methylation),
-    )?;
+    )
+    .unwrap();
     fs::write(
         all_methylations_file,
-        Windows::print_all_steady_state_methylations(
-            methylome_files
-                .iter()
-                .map(|f| f.1.to_str().unwrap().to_string())
-                .collect(),
-            steady_state_methylations.into_inner().unwrap(),
-        ),
-    )?;
+        Windows::print_all_steady_state_methylations(names, steady_state_meth),
+    )
+    .unwrap();
 
     println!("Done in: {:?}", start.elapsed());
 
-    Ok((max_gene_length, d[0].clone()))
+    Ok((max_gene_length, distributions[0].clone()))
 }

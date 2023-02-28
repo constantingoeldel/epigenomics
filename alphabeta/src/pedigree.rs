@@ -21,7 +21,7 @@ struct Node {
     rc_meth_lvl: Option<f64>,
     sites: Option<Vec<MethylationSite>>, // Might lead to memory issues if there are too many sites. But it makes lookup really fast.
 }
-
+#[derive(Debug)]
 struct Edge<'a> {
     from: &'a Node,
     to: &'a Node,
@@ -75,8 +75,8 @@ impl Pedigree {
         Pedigree(pedigree)
     }
 
-    pub fn to_file(&self, filename: &str) -> std::io::Result<()> {
-        let mut file = File::create(filename).unwrap();
+    pub fn to_file(&self, path: &Path) -> std::io::Result<()> {
+        let mut file = File::create(path.join("pedigree.txt")).unwrap();
         let mut content = String::new();
         content += "time0\ttime1\ttime2\tD.value\n";
         for row in self.rows() {
@@ -100,11 +100,12 @@ impl Pedigree {
         let edges = fs::read_to_string(edgelist)?;
 
         let nodes: Vec<Node> = nodes
-            .split('\n')
+            .split(['\n', '\r'])
             .skip(1)
             .enumerate()
             .filter_map(|(i, line)| {
-                let mut entries = line.split(',');
+                let mut entries = line.split([',', '\t', ' ']);
+
                 Some(Node {
                     id: i,
                     file: PathBuf::from(entries.next()?),
@@ -117,7 +118,6 @@ impl Pedigree {
                 })
             })
             .collect();
-
         if nodes.is_empty() {
             return Err(anyhow::anyhow!(
                 "No nodes could be parsed from the nodelist"
@@ -125,7 +125,7 @@ impl Pedigree {
         }
 
         let edges: Vec<Edge> = edges
-            .split('\n')
+            .split(['\n', '\r'])
             .skip(1)
             .filter_map(|line| {
                 let mut entries = line.split(['\t', ' ', ',']);
@@ -139,7 +139,6 @@ impl Pedigree {
             .collect();
 
         let mut nodes: Vec<Node> = nodes.iter().filter(|n| n.meth).cloned().collect();
-
         for node in nodes.iter_mut() {
             let mut file = PathBuf::from(nodelist.parent().unwrap());
             file.push(&node.file);
@@ -187,7 +186,6 @@ impl Pedigree {
             / nodes.len() as f64;
 
         //  println!("finalizing pedigree data...");
-
         let divergence = DMatrix::from(&nodes, posterior_max_filter);
         let pedigree = divergence.convert(&nodes, &edges);
         Ok((pedigree, tmp0uu))
@@ -202,27 +200,16 @@ impl Deref for Pedigree {
     }
 }
 
+#[derive(Debug)]
 struct DMatrix(Array2<f64>);
 
 impl DMatrix {
     fn from(nodes: &Vec<Node>, posterior_max: f64) -> Self {
         let mut divergences = Array2::<f64>::zeros((nodes.len(), nodes.len()));
 
-        // let number_of_pairs: u128 = (1..=nodes.len() as u128).product::<u128>()
-        //     / (2 * (1..=(nodes.len() - 2) as u128).product::<u128>()); // n choose 2 => n! / (2 * (n-2)!)
-
-        // let mut count = 0;
         // Go over all pairs of nodes, excluding self-pairs
         for (i, first) in nodes.iter().enumerate() {
             for (j, second) in nodes.iter().skip(i + 1).enumerate() {
-                // println!(
-                //     "Reading sample: {} and {} ({} of {} pairs) ",
-                //     first.name,
-                //     second.name,
-                //     count + 1,
-                //     number_of_pairs
-                // );
-
                 assert!(first.sites.as_ref().is_some());
                 assert!(second.sites.as_ref().is_some());
                 assert_eq!(
@@ -253,16 +240,13 @@ impl DMatrix {
 
                 let divergence = divergence as f64 / (2.0 * compared_sites as f64);
                 divergences[[i, j]] = divergence;
-                //   println!("Done! Divergence: {divergence}");
-                // count += 1;
+                println!("Done! Divergence: {divergence}");
             }
         }
         DMatrix(divergences)
     }
     /// Convert graph of divergences to pedigree
     fn convert(&self, nodes: &[Node], edges: &[Edge]) -> Pedigree {
-        //  dbg!(&self.0);
-
         let e = edges
             .iter()
             .map(|e| {
@@ -351,7 +335,10 @@ mod tests {
         let pedigree = Pedigree::build(nodelist, edgelist, 0.99).expect("Could not build pedigree");
 
         assert_eq!(pedigree.0.shape(), &[4 * 3 / 2, 4]);
-        pedigree.0.to_file("./data/pedigree_generated.txt").unwrap();
+        pedigree
+            .0
+            .to_file(Path::new("./data/pedigree_generated.txt"))
+            .unwrap();
         assert_close!(pedigree.1, 0.4567024);
     }
 

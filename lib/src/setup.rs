@@ -1,16 +1,11 @@
 use crate::*;
 
 pub fn set_up_output_dir(args: Args, max_gene_length: u32) -> Result<()> {
-    let output_dir = PathBuf::from(&args.output_dir).canonicalize()?;
-    fs::read_dir(&output_dir).map_err(|_| {
-        Error::File(
-            String::from("Output directory"),
-            String::from(&args.output_dir),
-        )
-    })?; // Throw error if base output dir does not exist
-         // Replace existing content of output dir
-    fs::remove_dir_all(&args.output_dir).unwrap();
-    fs::create_dir(&args.output_dir).unwrap();
+    fs::read_dir(&args.output_dir).or(Err(Error::File(args.output_dir.clone())))?; // Throw error if base output dir does not exist
+
+    // // Replace existing content of output dir
+    // fs::remove_dir_all(&args.output_dir).unwrap();
+    // fs::create_dir(&args.output_dir).unwrap();
 
     let edgelist = fs::read_to_string(args.edges)?;
     let nodes = fs::read_to_string(args.nodes)?;
@@ -34,7 +29,7 @@ pub fn set_up_output_dir(args: Args, max_gene_length: u32) -> Result<()> {
                     let filename = old_file.split('/').last().unwrap();
                     let file = format!(
                         "{}/{}/{}/{}",
-                        &output_dir.to_string_lossy(),
+                        &args.output_dir.to_string_lossy(),
                         side,
                         window,
                         filename
@@ -46,7 +41,7 @@ pub fn set_up_output_dir(args: Args, max_gene_length: u32) -> Result<()> {
                 nodelist += "\n";
             }
 
-            let path = format!("{}/{}/{}", &output_dir.to_string_lossy(), side, window);
+            let path = format!("{}/{}/{}", &args.output_dir.to_string_lossy(), side, window);
             let window_dir = fs::read_dir(&path);
 
             match window_dir {

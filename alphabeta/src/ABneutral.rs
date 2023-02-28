@@ -14,7 +14,6 @@ pub fn run(
     pb: Option<ProgressBar>,
 ) -> Result<Model, Box<dyn std::error::Error>> {
     let pb = pb.unwrap_or_else(move || Progress::new("ABneutral", n_starts).0);
-
     let p0mm = 1.0 - p0uu;
     let p0um = 0.0;
     let max_divergence = *pedigree
@@ -66,7 +65,6 @@ pub fn run(
         //     / ((m.alpha + m.beta) * ((m.alpha + m.beta - 1.0).powi(2) - 2.0));
         // let predicted_uu = (m.beta * ((1.0 - m.beta).powi(2) - (1.0 - m.alpha).powi(2) - 1.0))
         //     / ((m.alpha + m.beta) * ((m.alpha + m.beta - 1.0).powi(2) - 2.0));
-        // dbg!(&m);
         results.lock().unwrap().push(m);
         // let c = counter.fetch_add(1, Ordering::SeqCst);
         pb.inc(1);

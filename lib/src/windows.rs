@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    fs::{File, OpenOptions},
+    fs::{File, FileType, OpenOptions},
     io::{self, BufRead, Write},
 };
 
@@ -35,6 +35,15 @@ impl Windows {
             downstream: vec![Vec::new(); up_down_window_count as usize],
         }
     }
+
+    fn empty() -> Self {
+        Windows {
+            upstream: Vec::new(),
+            downstream: Vec::new(),
+            gene: Vec::new(),
+        }
+    }
+
     pub fn get(&self, region: Region) -> &Vec<Window> {
         match region {
             Region::Upstream => &self.upstream,
@@ -146,7 +155,73 @@ impl Windows {
         output
     }
 
-    pub fn save(&self, args: &Args, filename: &OsString) -> Result<()> {
+    /// Load an existing extraction into memory for further analysis.
+    /// Depends on the standard structure as outputted from this program.
+    ///
+    /// Important: Methylome files must be in the
+    fn load_existing(args: &Args, file_name: &str) -> Result<Self> {
+        let output_dir = fs::read_dir(&args.output_dir)?;
+
+        let mut result = Windows::empty();
+        for dir in output_dir {
+            let dir = dir.unwrap();
+
+            if !dir.file_type().unwrap().is_dir() {
+                break;
+            }
+
+            let region = match dir.path() {
+                p if p.ends_with("gene") => Region::Gene,
+                p if p.ends_with("downstream") => Region::Downstream,
+                p if p.ends_with("upstream") => Region::Upstream,
+                _ => break,
+            };
+
+            let windows = fs::read_dir(dir.path())?;
+
+            for window in windows {
+                let window = window.unwrap();
+
+                if !window.file_type().unwrap().is_dir() {
+                    break;
+                }
+
+                for file in fs::read_dir(window.path())? {
+                    let file = file.unwrap();
+
+                    let name = files::file_name(&file.path());
+
+                    if name != file_name {
+                        continue;
+                    }
+
+                    let lines = lines_from_file(&file.path())?;
+
+                    let mut sites = Vec::new();
+                    let mut error_count = 0;
+                    for line in lines {
+                        let line = line.unwrap();
+                        let m = MethylationSite::from_methylome_file_line(&line, args.invert);
+
+                        match m {
+                            Ok(site) => sites.push(site),
+                            Err(..) => error_count += 1,
+                        }
+                    }
+
+                    if error_count > 1 || sites.len() < 5 {
+                        continue;
+                    } else {
+                        result.get_mut(&region).push(sites);
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub fn save(&self, args: &Args, filename: String) -> Result<()> {
         for windows in vec![
             (&self.upstream, "upstream"),
             (&self.gene, "gene"),
@@ -155,13 +230,12 @@ impl Windows {
         .iter()
         {
             for (window, cg_sites) in windows.0.iter().enumerate() {
-                let output_file = format!(
-                    "{}/{}/{}/{}",
-                    args.output_dir,
+                let output_file = args.output_dir.join(format!(
+                    "{}/{}/{}",
                     windows.1,
                     window * args.window_step as usize,
-                    filename.to_str().unwrap()
-                );
+                    filename
+                ));
                 let mut file = OpenOptions::new()
                     .append(true)
                     .create(true)
@@ -177,53 +251,62 @@ impl Windows {
         }
         Ok(())
     }
-}
 
-pub fn extract_windows(
-    methylome_file: File,
-    genome: Vec<GenesByStrand>,
-    max_gene_length: u32,
-    args: Args,
-    filename: String,
-    bars: &MultiProgress,
-) -> Result<Windows> {
-    let mut last_gene: Option<&Gene> = None;
+    pub fn extract(
+        methylome_file: File,
+        genome: Vec<GenesByStrand>,
+        max_gene_length: u32,
+        args: Args,
+        file_name: String,
+        bars: &MultiProgress,
+    ) -> Result<Self> {
+        // Check for results already present
+        if let Ok(windows) = Self::load_existing(&args, &file_name) {
+            println!("Skipping extraction as parsable files are found in output directory");
+            return Ok(windows);
+        }
 
-    let mut windows = Windows::new(max_gene_length, &args);
+        let mut last_gene: Option<&Gene> = None;
 
-    const BYTES_PER_LINE: u64 = 34113682 / 950045; // Taken from a random sample, used to estimate number of lines without actually counting
-    let sty = ProgressStyle::with_template(
-        "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
-    )
-    .unwrap()
-    .progress_chars("##-");
-    let n_lines = methylome_file.metadata().unwrap().len() / BYTES_PER_LINE;
+        let mut windows = Windows::new(max_gene_length, &args);
 
-    let pb = bars.add(ProgressBar::new(n_lines));
-    pb.set_style(sty);
-    pb.set_message(filename);
+        // size estimation
+        const BYTES_PER_LINE: u64 = 34113682 / 950045; // Taken from a random sample, used to estimate number of lines without actually counting
+        let n_lines = methylome_file.metadata().unwrap().len() / BYTES_PER_LINE;
 
-    let lines = io::BufReader::new(methylome_file).lines();
+        // Progress bars
+        let sty = ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap()
+        .progress_chars("##-");
 
-    for line_result in lines.skip(1) {
-        // skip header row
-        pb.inc(1);
-        if let Ok(line) = line_result {
-            // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
-            let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
+        let pb = bars.add(ProgressBar::new(n_lines));
+        pb.set_style(sty);
+        pb.set_message(file_name);
 
-            if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
-                last_gene = cg.find_gene(&genome, args.cutoff);
-            }
-            if let Some(gene) = last_gene {
-                cg.place_in_windows(gene, &mut windows, &args);
-                continue;
+        let lines = io::BufReader::new(methylome_file).lines();
+
+        // read file, skip header row
+        for line_result in lines.skip(1) {
+            pb.inc(1);
+            if let Ok(line) = line_result {
+                // If cg site could not be extracted from a file line, continue with the next line. Happens on header rows, for example.
+                let Ok(cg) = MethylationSite::from_methylome_file_line(&line, args.invert) else {continue;};
+
+                if last_gene.is_none() || !cg.is_in_gene(last_gene.unwrap(), args.cutoff) {
+                    last_gene = cg.find_gene(&genome, args.cutoff);
+                }
+                if let Some(gene) = last_gene {
+                    cg.place_in_windows(gene, &mut windows, &args);
+                    continue;
+                }
             }
         }
-    }
-    pb.finish();
+        pb.finish();
 
-    Ok(windows)
+        Ok(windows)
+    }
 }
 
 impl Display for Windows {
@@ -244,13 +327,12 @@ mod test {
     #[test]
     fn new_absolute() {
         let args = Args {
-            methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
-            genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
-                .to_string(),
+            methylome: "/home/constantin/methylome/within_gbM_genes".into(),
+            genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed".into(),
             window_size: 512,
             window_step: 256,
 
-            output_dir: "/home/constantin/windows".to_string(),
+            output_dir: "/home/constantin/windows".into(),
             absolute: true,
             cutoff: 2048,
             ..Default::default()
@@ -263,13 +345,12 @@ mod test {
     #[test]
     fn new_relative() {
         let args = Args {
-            methylome: "/home/constantin/methylome/within_gbM_genes".to_string(),
-            genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed"
-                .to_string(),
+            methylome: "/home/constantin/methylome/within_gbM_genes".into(),
+            genome: "/home/constantin/methylome/gbM_gene_anotation_extract_Arabidopsis.bed".into(),
             window_size: 5,
             window_step: 1,
 
-            output_dir: "/home/constantin/windows".to_string(),
+            output_dir: "/home/constantin/windows".into(),
             absolute: false,
             cutoff: 2048,
             ..Default::default()

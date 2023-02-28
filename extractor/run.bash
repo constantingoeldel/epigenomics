@@ -1,10 +1,12 @@
-# # WT
+# WT
 # cargo run --release -- \
 # -m ../../methylome/within_gbM_genes/ \
 # -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
-# -o ../../windows \
+# -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/wt \
 # -e ../../methylome/edgelist.txt \
 # -n ../../methylome/nodelist.txt \
+# --alphabeta \
+# --name wildtype \
 # -s 1 -w 5 
 
 # # CMT3
@@ -28,15 +30,15 @@
 # -s 1 -w 5 
 
 # ros 
-cargo run --release -- \
--m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
--g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
--o ../../windows \
--e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_ros_mock.tsv \
--n /mnt/nas/zhilin/others/constantin-sergio/biostress-data/nodelist_ros_mock.tsv \
---name ros \
---alphabeta \
--s 1 -w 5 
+#cargo run --release -- \
+#-m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
+#-g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+#-o ../../windows \
+#-e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_ros_mock.tsv \
+#-n /mnt/nas/zhilin/others/constantin-sergio/biostress-data/nodelist_ros_mock.tsv \
+#--name ros \
+#--alphabeta \
+#-s 1 -w 5 
 
 # # nrpe 
 # cargo run --release -- \
@@ -50,12 +52,13 @@ cargo run --release -- \
 
 
 # # col 
-# cargo run --release -- \
-# -m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
-# -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
-# -o ../../windows \
-# -e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_col_mock.tsv \
-# -n /mnt/nas/zhilin/others/constantin-sergio/biostress-data/nodelist_col_mock.tsv \
-# --name col \
-# -s 1 -w 5 
+ cargo run --release -- \
+ -m /mnt/nas/zhilin/others/constantin-sergio/biostress-data \
+ -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+ -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/windows_col \
+ -e /mnt/nas/zhilin/others/constantin-sergio/biostress-data/edgelist_col_mock.tsv \
+ -n ../../methylome/nodelist_col_mock.tsv \
+ --name col \
+ -s 1 -w 5 \
+--alphabeta
 

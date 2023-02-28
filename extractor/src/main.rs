@@ -1,7 +1,6 @@
-use std::{fmt::Write, fs::write, path::Path, time::Duration};
+use std::{fmt::Write, fs::write, time::Duration};
 
 use clap::Parser;
-use db::import_results;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use lib::{arguments::Args, structs::Region, *};
 
@@ -52,17 +51,15 @@ async fn main() {
                     for window in (0..max).step_by(args.window_step as usize) {
                         pb.inc(1);
                         let alphabeta_result = alphabeta::run(
-                            Path::new(&format!(
-                                "{}/{}/{}/nodelist.txt",
-                                &args.output_dir, &region.0, window
-                            )),
-                            Path::new(&format!(
-                                "{}/{}/{}/edgelist.txt",
-                                &args.output_dir, &region.0, window
-                            )),
+                            &args
+                                .output_dir
+                                .join(&format!("{}/{}/nodelist.txt", &region.0, window)),
+                            &args
+                                .output_dir
+                                .join(&format!("{}/{}/edgelist.txt", &region.0, window)),
                             0.99,
-                            10,
-                            format!("{}/{}/{}/", &args.output_dir, region.0, window),
+                            100,
+                            &args.output_dir.join(format!("{}/{}/", region.0, window)),
                             &multi,
                         );
                         match alphabeta_result {
@@ -99,12 +96,12 @@ async fn main() {
 
                 println!("{print}");
 
-                write(args.output_dir + "/results.txt", print)
+                write(args.output_dir.join("results.txt"), print)
                     .expect("Could not save results to file.");
-                let db = db::connect()
-                    .await
-                    .expect("Could not connect to database: Did you provide a connection string?");
-                import_results(&db, args.name, results).await.expect("Could not save results to a database. Your data is stored in files in each directory");
+                // let db = db::connect()
+                //     .await
+                //     .expect("Could not connect to database: Did you provide a connection string?");
+                // import_results(&db, args.name, results).await.expect("Could not save results to a database. Your data is stored in files in each directory");
             }
         }
     }

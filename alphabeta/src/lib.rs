@@ -22,12 +22,12 @@ pub fn run(
     edgelist: &Path,
     posterior_max_filter: f64,
     iterations: u64,
-    output: String,
+    output: &Path,
     bars: &MultiProgress,
 ) -> Result<(Model, StandardDeviations), Error> {
     let (pedigree, p0uu) = Pedigree::build(nodelist, edgelist, posterior_max_filter)
         .map_err(|e| anyhow!("Error while building pedigree: {}", e))?;
-    pedigree.to_file(&format!("{output}/pedigree.txt"))?;
+    pedigree.to_file(output)?;
 
     let pb_neutral = bars.insert(0, ProgressBar::new(iterations));
     let pb_boot = bars.insert(1, ProgressBar::new(iterations));
@@ -71,7 +71,7 @@ pub fn run(
     println!("{model}");
     println!("{result}");
     println!("##########");
-    model.to_file(&format!("{output}/model.txt"), &result)?;
+    model.to_file(output, &result)?;
     Ok((model, result))
 }
 

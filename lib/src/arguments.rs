@@ -8,11 +8,11 @@ use clap::Parser;
 pub struct Args {
     /// Path of directory containing the methlyome files from which to extract the CG-sites
     #[arg(short, long)]
-    pub methylome: String,
+    pub methylome: PathBuf,
 
     /// Path of the annotation file containing information about beginning and end of gbM-genes
     #[arg(short, long)]
-    pub genome: String,
+    pub genome: PathBuf,
 
     /// Size of the window in percent of the gbM-gene length or in basepair number if --absolute is supplied
     #[arg(short, long, default_value_t = 5)]
@@ -24,7 +24,7 @@ pub struct Args {
 
     /// Path of the directory where extracted segments shall be stored
     #[arg(short, long)]
-    pub output_dir: String,
+    pub output_dir: PathBuf,
 
     /// Use absolute length in base-pairs for window size instead of percentage of gene length
     #[arg(short, long, default_value_t = false)]
@@ -57,6 +57,10 @@ pub struct Args {
     /// Name of the run to be used when storing the result in Postgres
     #[arg(long, default_value_t = format!("{:?}", std::time::Instant::now()))]
     pub name: String,
+
+    /// Overwrite existing content in output directory? If false (default) it will reuse existing windows
+    #[arg(long, short, default_value_t = false)]
+    pub force: bool,
 }
 
 impl Default for Args {
@@ -66,15 +70,16 @@ impl Default for Args {
             invert: false,
             absolute: false,
             cutoff: 2048,
-            genome: String::from("default"),
-            methylome: String::from("also default"),
-            output_dir: String::from("also default"),
+            genome: PathBuf::from("default"),
+            methylome: PathBuf::from("also default"),
+            output_dir: PathBuf::from("also default"),
             window_size: 5,
             window_step: 1,
             edges: PathBuf::new(),
             nodes: PathBuf::new(),
             alphabeta: false,
             name: String::new(),
+            force: false,
         }
     }
 }
