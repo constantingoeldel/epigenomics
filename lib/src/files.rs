@@ -14,11 +14,15 @@ pub fn lines_from_file(path: &PathBuf) -> Result<io::Lines<io::BufReader<File>>>
 
 pub fn load_methylome(methylome: &PathBuf) -> Result<Vec<PathBuf>> {
     let methylome_dir = fs::read_dir(methylome).or(Err(Error::File(methylome.to_owned())))?;
-    let methylome_files = methylome_dir
+    let methylome_files: Vec<PathBuf> = methylome_dir
         .map(|f| f.as_ref().unwrap().path())
         .filter(|path| !path.extension().contains(&"tsv") && !path.extension().contains(&"fn")) // Filter out tsv and fn files, which are often nodelist/edgelist files.
         .collect();
-    Ok(methylome_files)
+    if methylome_files.is_empty() {
+        Err(Error::Simple("Could not find any files in the methylome directory. Please check your input. Files with .tsv or .fn extensions are ignored."))
+    } else {
+        Ok(methylome_files)
+    }
 }
 /// Highly sacriligous
 pub fn file_name(path: &Path) -> String {
