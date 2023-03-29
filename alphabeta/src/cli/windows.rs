@@ -1,11 +1,8 @@
-use std::{fmt::Write, fs::write, time::Duration};
-
 use clap::Parser;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
-use lib::{arguments::Args, structs::Region, *};
-
-#[tokio::main]
-async fn main() {
+use std::{fmt::Write, fs::write, time::Duration};
+use windows::*;
+fn main() {
     let args = Args::parse();
     println!("Starting run {}", args.name);
     match extract(args.clone()) {

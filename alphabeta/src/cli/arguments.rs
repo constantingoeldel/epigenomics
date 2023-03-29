@@ -5,7 +5,7 @@ use clap::Parser;
 /// simple tool to separate a methylome by position within a gene
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
-pub struct Args {
+pub struct Windows {
     /// Path of directory containing the methlyome files from which to extract the CG-sites
     #[arg(short, long)]
     pub methylome: PathBuf,
@@ -68,7 +68,7 @@ pub struct Args {
     pub cutoff_gene_length: bool,
 }
 
-impl Default for Args {
+impl Default for Windows {
     fn default() -> Self {
         Args {
             db: false,
@@ -86,6 +86,39 @@ impl Default for Args {
             name: String::new(),
             force: false,
             cutoff_gene_length: false,
+        }
+    }
+}
+
+#[derive(Parser, Debug, Clone)]
+#[command(author, version, about, long_about = None)]
+pub struct Alphabeta {
+    #[arg(short, long, default_value_t = 1000)]
+    pub iterations: u64,
+
+    /// Provide an edgefile
+    #[arg(long, short)]
+    pub edgelist: std::path::PathBuf,
+
+    /// Provide a nodefile - paths will be updated to match the output directory
+    #[arg(long, short)]
+    pub nodelist: std::path::PathBuf,
+
+    #[arg(long, short, default_value_t = 0.99)]
+    pub posterior_max_filter: f64,
+
+    #[arg(long, short)]
+    pub output: std::path::PathBuf,
+}
+
+impl Alphabeta {
+    pub fn default(output_dir: PathBuf) -> Self {
+        Self {
+            edgelist: output_dir.join("edgelist.txt"),
+            nodelist: output_dir.join("nodelist.txt"),
+            output: output_dir,
+            posterior_max_filter: 0.99,
+            iterations: 100,
         }
     }
 }

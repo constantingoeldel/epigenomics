@@ -14,15 +14,15 @@ use std::{
     path::PathBuf,
     sync::Mutex,
 };
-use structs::*;
 use windows::*;
+use windows_structs::*;
 pub mod arguments;
 pub mod error;
 pub mod files;
 pub mod methylation_site;
 pub mod setup;
-pub mod structs;
 pub mod windows;
+pub mod windows_structs;
 
 pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     let start = std::time::Instant::now();

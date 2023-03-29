@@ -9,6 +9,19 @@ cargo run --release -- \
 --name wildtype \
 -s 1 -w 5 
 
+# WT
+cargo run --release -- \
+-m ../../methylome/within_gbM_genes/ \
+-g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+-o ../../windows/wt \
+-e ../../methylome/edgelist.txt \
+-n ../../methylome/nodelist.txt \
+--alphabeta \
+--name wildtype \
+-s 1 -w 5 
+
+
+
 # # CMT3
 # cargo run --release -- \
 # -m /mnt/nas/zhilin/others/constantin-sergio/CMT3/total_original_methylome \
