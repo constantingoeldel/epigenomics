@@ -1,6 +1,7 @@
-use std::{fmt::Display, fs::File, io::Write, ops::Deref};
+use std::{fmt::Display, fs::File, io::Write, ops::Deref, path::PathBuf};
 
 use argmin::core::CostFunction;
+use clap::Parser;
 use ndarray::Array1;
 use rand::{distributions::Uniform, thread_rng, Rng};
 
@@ -25,6 +26,18 @@ pub struct Args {
 
     #[arg(long, short)]
     pub output: std::path::PathBuf,
+}
+
+impl Args {
+    pub fn default(output_dir: PathBuf) -> Self {
+        Self {
+            edgelist: output_dir.join("edgelist.txt"),
+            nodelist: output_dir.join("nodelist.txt"),
+            output: output_dir,
+            posterior_max_filter: 0.99,
+            iterations: 100,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

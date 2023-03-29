@@ -51,18 +51,14 @@ async fn main() {
 
                     for window in (0..max).step_by(args.window_step as usize) {
                         pb.inc(1);
-                        let alphabeta_result = alphabeta::run(
-                            &args
-                                .output_dir
-                                .join(&format!("{}/{}/nodelist.txt", &region.0, window)),
-                            &args
-                                .output_dir
-                                .join(&format!("{}/{}/edgelist.txt", &region.0, window)),
-                            0.99,
-                            100,
-                            &args.output_dir.join(format!("{}/{}/", region.0, window)),
-                            &multi,
+
+                        let args = alphabeta::structs::Args::default(
+                            args.output_dir
+                                .join(region.0.to_string())
+                                .join(window.to_string()),
                         );
+
+                        let alphabeta_result = alphabeta::AlphaBeta::new(args, &multi).run();
                         match alphabeta_result {
                             Err(e) => println!("Error: {e}"),
                             Ok((model, errors)) => results.push((model, errors, region.0.clone())),

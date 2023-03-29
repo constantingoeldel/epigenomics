@@ -4,6 +4,7 @@ pub mod divergence;
 pub mod macros;
 pub mod pedigree;
 pub mod structs;
+pub mod utils;
 extern crate blas_src;
 
 use std::path::Path;
@@ -17,46 +18,39 @@ pub use structs::*;
 pub use ABneutral::*;
 pub use BootModel::*;
 
-pub struct AlphaBeta {
+use crate::utils::progress_bar;
+
+pub struct AlphaBeta<'bar> {
     args: Args,
+    bars: &'bar MultiProgress,
 }
 
-impl AlphaBeta {
-    pub fn new(args: Args) -> Self {
-        AlphaBeta { args }
+impl<'bar> AlphaBeta<'bar> {
+    pub fn new(args: Args, bars: &'bar MultiProgress) -> Self {
+        AlphaBeta { args, bars }
     }
 
-    pub fn run(&self, bars: &MultiProgress) -> Result<(Model, StandardDeviations), Error> {
-        let (pedigree, p0uu) = Pedigree::build(
-            &self.args.nodelist,
-            &self.args.edgelist,
-            self.args.posterior_max_filter,
-        )
-        .map_err(|e| anyhow!("Error while building pedigree: {}", e))?;
+    pub fn run(&self) -> Result<(Model, StandardDeviations), Error> {
+        let Args {
+            nodelist,
+            edgelist,
+            iterations,
+            output,
+            posterior_max_filter,
+        } = &self.args;
+
+        let (pedigree, p0uu) = Pedigree::build(nodelist, edgelist, *posterior_max_filter)
+            .map_err(|e| anyhow!("Error while building pedigree: {}", e))?;
         pedigree.to_file(output)?;
 
-        let pb_neutral = bars.insert(0, ProgressBar::new(iterations));
-        let pb_boot = bars.insert(1, ProgressBar::new(iterations));
-
-        pb_neutral.set_message("ABNeutral");
-        pb_boot.set_message("BootModel");
-        pb_neutral.set_style(
-            ProgressStyle::with_template("{msg} {bar:40.cyan/blue} [{elapsed}] {pos:>7}/{len:7}")
-                .unwrap(),
-        );
-
-        pb_boot.set_style(
-            ProgressStyle::with_template("{msg} {bar:40.cyan/blue} [{elapsed}] {pos:>7}/{len:7}")
-                .unwrap(),
-        );
-        pb_boot.tick();
+        let (pb_neutral, pb_boot) = progress_bar(self.bars, iterations);
 
         let model = ABneutral::run(
             &pedigree,
             p0uu,
             p0uu,
             1.0,
-            iterations,
+            *iterations,
             Some(pb_neutral.clone()),
         )
         .map_err(|e| anyhow!("Model failed: {}", e))?;
@@ -66,21 +60,18 @@ impl AlphaBeta {
             p0uu,
             p0uu,
             1.0,
-            iterations,
+            *iterations,
             Some(pb_boot.clone()),
         )
         .map_err(|e| anyhow!("Bootstrap failed: {}", e))?;
-        bars.remove(&pb_neutral);
-        bars.remove(&pb_boot);
-        println!("##########");
-        println!("Results:\n");
-        println!("{model}");
-        println!("{result}");
-        println!("##########");
+        self.bars.remove(&pb_neutral);
+        self.bars.remove(&pb_boot);
+
         model.to_file(output, &result)?;
         Ok((model, result))
     }
 }
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
