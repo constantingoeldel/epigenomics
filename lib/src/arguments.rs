@@ -59,7 +59,7 @@ pub struct Args {
     pub name: String,
 
     /// Overwrite existing content in output directory? If false (default) it will reuse existing windows
-    #[arg(long, short, default_value_t = false)]
+    #[arg(long, short, default_value_t = true)]
     pub force: bool,
     /// Let the cutoff be the gene length instead of a fixed number.
     /// So if the gene is 1000 bp long, the cutoff will be 1000 bp instead of 2048 bp (the default).

@@ -85,20 +85,33 @@ impl Windows {
     }
 
     pub fn steady_state_methylation(&self) -> Vec<f64> {
+        let obs = |acc: f64, cur: &MethylationSite| {
+            // if cur.count_total == 0 {
+            //     acc
+            // } else {
+            //     acc + cur.count_methylated as f64 / cur.count_total as f64
+            // }
+            match cur.status {
+                MethylationStatus::U => acc,
+                MethylationStatus::I => acc + 0.5,
+                MethylationStatus::M => acc + 1.0,
+            }
+        };
+
         let mut upstream: Vec<f64> = self
             .upstream
             .iter()
-            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
+            .map(|w| w.iter().fold(0.0, obs) / w.len() as f64)
             .collect();
         let mut gene: Vec<f64> = self
             .gene
             .iter()
-            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
+            .map(|w| w.iter().fold(0.0, obs) / w.len() as f64)
             .collect();
         let mut downstream: Vec<f64> = self
             .downstream
             .iter()
-            .map(|w| w.iter().fold(0.0, |acc, cur| acc + cur.meth_lvl) / w.len() as f64)
+            .map(|w| w.iter().fold(0.0, obs) / w.len() as f64)
             .collect();
 
         gene.append(&mut downstream);

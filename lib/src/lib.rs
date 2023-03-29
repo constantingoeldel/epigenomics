@@ -172,6 +172,5 @@ pub fn extract(args: Args) -> Result<(u32, Vec<i32>)> {
     )?;
 
     println!("Done in: {:?}", start.elapsed());
-
     Ok((max_gene_length, distributions[0].clone()))
 }

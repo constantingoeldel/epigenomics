@@ -1,32 +1,34 @@
 # WT
-# cargo run --release -- \
-# -m ../../methylome/within_gbM_genes/ \
-# -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
-# -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/wt \
-# -e ../../methylome/edgelist.txt \
-# -n ../../methylome/nodelist.txt \
-# --alphabeta \
-# --name wildtype \
-# -s 1 -w 5 
+cargo run --release -- \
+-m ../../methylome/within_gbM_genes/ \
+-g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+-o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/wt \
+-e ../../methylome/edgelist.txt \
+-n ../../methylome/nodelist.txt \
+--alphabeta \
+--name wildtype \
+-s 1 -w 5 
 
 # # CMT3
 # cargo run --release -- \
 # -m /mnt/nas/zhilin/others/constantin-sergio/CMT3/total_original_methylome \
 # -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
-# -o ../../windows \
+# -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/cmt3 \
 # -e /home/constantin/methylome/cmt3_edgelist.txt \
 # -n /home/constantin/methylome/cmt3_nodelist.txt \
+# --alphabeta \
 # --name cmt3 \
 # -s 1 -w 5 
 
-# # suv 4/5/6
+# suv 4/5/6
 # cargo run --release -- \
 # -m /mnt/nas/zhilin/others/constantin-sergio/SUV456/total_original_methylome \
 # -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
-# -o ../../windows \
+# -o /mnt/extStorage/workingDir/constantin_not_owned_by_postgres/windows/suv \
 # -e /mnt/nas/zhilin/others/constantin-sergio/SUV456/SUV456_edgelist.txt \
 # -n /mnt/nas/zhilin/others/constantin-sergio/SUV456/SUV456_nodelist.txt \
 # --name suv \
+# --alphabeta \
 # -s 1 -w 5 
 
 # ros 
@@ -72,15 +74,15 @@
 # --cutoff-gene-length
 
 
-h2az
-cargo run --release -- \
--m ../../h2az \
--g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
--s 1 -w 5 \
--o ../../windows \
---name h2az \
---force
-# --cutoff-gene-length
+# h2az
+# cargo run --release -- \
+# -m ../../h2az \
+# -g ../../methylome/gbM_gene_anotation_extract_Arabidopsis.bed \
+# -s 1 -w 5 \
+# -o ../../windows \
+# --name h2az \
+# --force
+# # --cutoff-gene-length
 
 # # chromatin states
 # cargo run --release -- \

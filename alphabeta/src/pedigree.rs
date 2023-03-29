@@ -90,12 +90,6 @@ impl Pedigree {
         edgelist: &Path,
         posterior_max_filter: f64,
     ) -> Result<(Self, f64), Error> {
-        // println!(
-        //     "Building pedigree from {} and {}",
-        //     nodelist.display(),
-        //     edgelist.display()
-        // );
-
         let nodes = fs::read_to_string(nodelist)?;
         let edges = fs::read_to_string(edgelist)?;
 
@@ -185,10 +179,21 @@ impl Pedigree {
             .sum::<f64>()
             / nodes.len() as f64;
 
+        let tmp0uu_meth_lvl = nodes
+            .iter()
+            .map(|n| 1.0 - n.rc_meth_lvl.unwrap())
+            .sum::<f64>()
+            / nodes.len() as f64;
+        // dbg!(
+        //     tmp0uu,
+        //     tmp0uu_meth_lvl,
+        //     (tmp0uu - tmp0uu_meth_lvl).abs() / tmp0uu
+        // );
+
         //  println!("finalizing pedigree data...");
         let divergence = DMatrix::from(&nodes, posterior_max_filter);
         let pedigree = divergence.convert(&nodes, &edges);
-        Ok((pedigree, tmp0uu))
+        Ok((pedigree, tmp0uu_meth_lvl))
     }
 }
 
@@ -240,7 +245,6 @@ impl DMatrix {
 
                 let divergence = divergence as f64 / (2.0 * compared_sites as f64);
                 divergences[[i, j]] = divergence;
-                println!("Done! Divergence: {divergence}");
             }
         }
         DMatrix(divergences)
