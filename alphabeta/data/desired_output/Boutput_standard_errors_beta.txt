@@ -1,1 +1,0 @@
-Boutput_standard_errors_beta_epimutation_rate_estimation_window_gene_0 0.00138056339729951

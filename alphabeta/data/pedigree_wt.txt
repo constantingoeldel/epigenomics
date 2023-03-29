@@ -1,1 +1,0 @@
-time0	time1	time2	D.value
